@@ -1,0 +1,20 @@
+name: Feature request
+description: Suggest an idea for MFPete.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: Describe the task or problem, not only the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: rule
+    attributes:
+      label: Rule you would write
+      description: If this is about rules, write it as "When…, if…, then…".
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you tried

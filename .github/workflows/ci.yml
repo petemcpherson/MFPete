@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: MFPeteCore tests
+        working-directory: Packages/MFPeteCore
+        run: swift test
+
+      - name: Build app and run app unit tests
+        run: |
+          xcodebuild test \
+            -project MFPete.xcodeproj \
+            -scheme MFPete \
+            -destination 'platform=macOS' \
+            -only-testing:MFPeteTests \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM=

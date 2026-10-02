@@ -125,6 +125,13 @@ struct MenuBarContent: View {
         }
         .keyboardShortcut(",")
 
+        if appState.updater.isAvailable {
+            Button("Check for Updates…") {
+                appState.updater.checkForUpdates()
+            }
+            .disabled(!appState.updater.canCheckForUpdates)
+        }
+
         Divider()
 
         Button("Quit MFPete") {

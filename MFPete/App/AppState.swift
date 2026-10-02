@@ -28,6 +28,7 @@ final class AppState {
 
     /// Runs rules and mirrors engine state for the UI.
     let engineController: EngineController
+    let updater = UpdaterService()
     @ObservationIgnored let modelContainer: ModelContainer
     @ObservationIgnored private let rulesStore: RulesStore
     @ObservationIgnored let defaults: UserDefaults

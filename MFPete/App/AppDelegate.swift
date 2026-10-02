@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setUpNotifications()
         appState.startActivityPruning()
         appState.engineController.start()
+        appState.updater.start()
         observeWorkspace()
         LaunchAlerts.show(for: appState)
         if !appState.hasCompletedOnboarding && OnboardingWindow.shouldShowAtLaunch {

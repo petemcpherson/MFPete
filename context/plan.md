@@ -11,7 +11,7 @@
 - [x] Phase 4: Menu bar and dashboard UI
 - [x] Phase 5: Rule editor, preview, and templates
 - [x] Phase 6: Activity log, settings, onboarding, and permissions
-- [ ] Phase 7: Distribution, updates, and release
+- [x] Phase 7: Distribution, updates, and release (code and tooling done; manual release steps open)
 
 ---
 
@@ -453,39 +453,51 @@ Goal: complete the remaining v1 surfaces so the app is trustworthy and self-expl
 
 ---
 
-## Phase 7: Distribution, updates, and release
+## Phase 7: Distribution, updates, and release [COMPLETED]
 
 Goal: signed, notarized builds on GitHub Releases, Sparkle updates, Homebrew cask, and a release-ready repo (D10, spec §14).
 
 ### 7.1 Sparkle 2
-- [ ] Add Sparkle 2 via SPM to the app target.
-- [ ] Generate EdDSA keys with Sparkle's `generate_keys`; store the private key in the macOS Keychain locally and as a GitHub Actions secret. Put `SUPublicEDKey` and `SUFeedURL` (GitHub-hosted `appcast.xml`) in Info.plist.
-- [ ] `SPUStandardUpdaterController` owned by the app; "Check for Updates…" in Settings › About (and optionally in the menu bar menu); "Automatically check for updates" toggle bound to `updater.automaticallyChecksForUpdates` (on by default).
-- [ ] Confirm Sparkle works with sandbox off (no XPC installer services needed).
+- [x] Add Sparkle 2 via SPM to the app target.
+- [ ] Generate EdDSA keys with Sparkle's `generate_keys`; store the private key in the macOS Keychain locally and as a GitHub Actions secret. Put `SUPublicEDKey` and `SUFeedURL` (GitHub-hosted `appcast.xml`) in Info.plist. (`SUFeedURL` set; key generation is a manual step, see `docs/RELEASING.md`.)
+- [x] `SPUStandardUpdaterController` owned by the app; "Check for Updates…" in Settings › About (and optionally in the menu bar menu); "Automatically check for updates" toggle bound to `updater.automaticallyChecksForUpdates` (on by default).
+- [x] Confirm Sparkle works with sandbox off (no XPC installer services needed).
 
 ### 7.2 Signing and notarization
-- [ ] Apple Developer Program account and Developer ID Application certificate.
-- [ ] Hardened Runtime on; no extra entitlements needed (sandbox off).
-- [ ] Release build script: `xcodebuild archive` → export with Developer ID → `notarytool submit --wait` → `stapler staple`.
-- [ ] Package `.dmg` (manual download) and `.zip` (Sparkle) from the stapled app.
+- [x] Apple Developer Program account and Developer ID Application certificate.
+- [x] Hardened Runtime on; no extra entitlements needed (sandbox off).
+- [x] Release build script: `xcodebuild archive` → export with Developer ID → `notarytool submit --wait` → `stapler staple`.
+- [x] Package `.dmg` (manual download) and `.zip` (Sparkle) from the stapled app.
 
 ### 7.3 GitHub Actions
-- [ ] CI workflow on push/PR: build app, run `MFPeteCore` tests and app unit tests.
-- [ ] Release workflow on tag push (`v*`): import signing certificate into a temp keychain, archive, notarize, staple, build `.dmg` + `.zip`, sign the zip with Sparkle's `sign_update`, update `appcast.xml`, create GitHub Release with assets.
+- [x] CI workflow on push/PR: build app, run `MFPeteCore` tests and app unit tests.
+- [x] Release workflow on tag push (`v*`): import signing certificate into a temp keychain, archive, notarize, staple, build `.dmg` + `.zip`, sign the zip with Sparkle's `sign_update`, update `appcast.xml`, create GitHub Release with assets.
 
 ### 7.4 Homebrew cask
-- [ ] Draft `mfpete.rb` cask (token `mfpete`, `auto_updates true`, `depends_on macos: ">= :sonoma"`, `zap` stanza for `~/Library/Application Support/MFPete` and preferences).
+- [x] Draft `mfpete.rb` cask (token `mfpete`, `auto_updates true`, `depends_on macos: ">= :sonoma"`, `zap` stanza for `~/Library/Application Support/MFPete` and preferences).
 - [ ] Submit to `homebrew/cask` after first public release meets their notability requirements; until then, document direct download.
 
 ### 7.5 Repo and docs
-- [ ] README: screenshots, what it does, templates, privacy statement (only network traffic is Sparkle update check), install (Homebrew + DMG), build instructions.
-- [ ] CONTRIBUTING.md and GitHub issue templates (bug, feature).
-- [ ] Verify all dependencies are MIT/BSD/Apache compatible.
+- [x] README: screenshots (still to capture), what it does, templates, privacy statement (only network traffic is Sparkle update check), install (Homebrew + DMG), build instructions.
+- [x] CONTRIBUTING.md and GitHub issue templates (bug, feature).
+- [x] Verify all dependencies are MIT/BSD/Apache compatible.
 
 ### 7.6 Release validation
-- [ ] Performance check against spec §5.8: idle CPU ~0%, under 60 MB resident with 20 rules, 5,000-item scan under 2 s (Instruments + a perf test in `MFPeteCore`).
+- [ ] Performance check against spec §5.8: idle CPU ~0%, under 60 MB resident with 20 rules, 5,000-item scan under 2 s (Instruments + a perf test in `MFPeteCore`). (Perf test done; Instruments check is manual.)
 - [ ] Clean-machine test on macOS 14 and current macOS: install from DMG, Gatekeeper passes, onboarding, TCC prompts, update from previous version via Sparkle.
 - [ ] Tag `v1.0.0`.
+
+**Implementation notes (decisions made in Phase 7):**
+- Sparkle 2.10 is a remote SPM package on the app target. `UpdaterService` (`MFPete/Services/UpdaterService.swift`, on `AppState.updater`) wraps `SPUStandardUpdaterController`. It starts from `AppDelegate` only when `SUPublicEDKey` is non-empty and the app is not under UI or unit tests. Settings › About shows "Check for Updates…" and "Automatically check for updates"; the menu bar shows "Check for Updates…" when the updater runs. Otherwise About says "Updates are turned off in this build."
+- Custom Info.plist keys live in `Config/Info.plist` (outside the synchronized `MFPete/` folder), merged with the generated plist. It holds `SUFeedURL`, `SUPublicEDKey` (empty until keys are generated), and `SUEnableAutomaticChecks` (on, so Sparkle does not ask on second launch). Also added `LSApplicationCategoryType` (utilities) and a copyright string; `MARKETING_VERSION` is now `1.0.0`.
+- Feed URL is `https://github.com/petemcpherson/MFPete/releases/latest/download/appcast.xml`: the appcast is a release asset, so no workflow pushes to `main`. Each appcast lists only its own release (no deltas).
+- `scripts/release.sh`: archive with manual Developer ID signing, export (`scripts/ExportOptions.plist`), verify, notarize + staple the app, then build the Sparkle `.zip` and a signed, notarized, stapled `.dmg` in `build/release/`. Build number defaults to the git commit count. `SKIP_NOTARIZE=1` builds locally without notarizing (checked: export and `codesign --verify` pass with Hardened Runtime). Notary credentials come from a keychain profile or an App Store Connect API key.
+- `scripts/make-appcast.sh` runs Sparkle's `generate_appcast` (which signs the zip) with the key from `SPARKLE_PRIVATE_KEY` or the login keychain.
+- `.github/workflows/ci.yml` (macos-26): `swift test` and app unit tests with ad-hoc signing. `.github/workflows/release.yml` on `v*` tags: temp keychain, release script, appcast, `gh release create`. Required secrets are listed in the workflow and in `docs/RELEASING.md`.
+- Homebrew cask draft: `packaging/homebrew/mfpete.rb` (sha256 placeholder until the first release).
+- `PerformanceTests` in `MFPeteCore`: full scan and preview of 5,000 files each finish under 2 s (about 1.3 s including file setup, debug build).
+- Dependencies: Sparkle (MIT) is the only third-party dependency.
+- Still manual (not done here): generate Sparkle keys and set `SUPublicEDKey`; add GitHub secrets; first notarized release; README screenshots; Instruments idle CPU and memory check; clean-machine tests on macOS 14 and current macOS; Sparkle update from a previous version; Homebrew submission; tag `v1.0.0`.
 
 **Done when:** a user can `brew install --cask mfpete` (or download the DMG), launch without Gatekeeper warnings, and receive a Sparkle update.
 

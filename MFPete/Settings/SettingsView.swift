@@ -266,6 +266,8 @@ private struct AdvancedSettings: View {
 // MARK: - About
 
 private struct AboutSettings: View {
+    @Environment(AppState.self) private var appState
+
     var body: some View {
         VStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -284,11 +286,27 @@ private struct AboutSettings: View {
             Divider()
                 .padding(.vertical, 4)
             // Sparkle "Check for Updates…" and the automatic-check toggle come in Phase 7.
-            Text("Update checks arrive in a later version.")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            UpdateControls(updater: appState.updater)
         }
         .padding(24)
         .frame(maxWidth: .infinity)
+    }
+}
+
+private struct UpdateControls: View {
+    @Bindable var updater: UpdaterService
+
+    var body: some View {
+        if updater.isAvailable {
+            VStack(spacing: 8) {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+                Toggle("Automatically check for updates", isOn: $updater.automaticallyChecksForUpdates)
+            }
+        } else {
+            Text("Updates are turned off in this build.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
     }
 }

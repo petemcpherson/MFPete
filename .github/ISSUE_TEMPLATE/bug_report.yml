@@ -1,0 +1,45 @@
+name: Bug report
+description: Something in MFPete does not work as expected.
+labels: [bug]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Create a rule that…
+        2. Add a file to…
+        3. See…
+    validations:
+      required: true
+  - type: textarea
+    id: rule
+    attributes:
+      label: Rule JSON
+      description: In the Rules window, choose Export… from the rule's ⋯ menu and paste the file here.
+      render: json
+  - type: textarea
+    id: activity
+    attributes:
+      label: Activity log
+      description: Matching lines from the Activity window, if any.
+  - type: input
+    id: mfpete-version
+    attributes:
+      label: MFPete version
+      description: Settings › About
+    validations:
+      required: true
+  - type: input
+    id: macos-version
+    attributes:
+      label: macOS version
+    validations:
+      required: true

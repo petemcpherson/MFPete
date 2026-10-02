@@ -446,7 +446,7 @@ Goal: complete the remaining v1 surfaces so the app is trustworthy and self-expl
 - `RuleImporter` (core) migrates, assigns new IDs, appends at the end, imports disabled, and reports unknown rules. Import / Export All are in Settings › Advanced.
 - Onboarding is a `Window` opened at launch when `hasCompletedOnboarding` is false. Closing it at any step counts as done. Template buttons open the Rules window with the editor pre-filled (`AppState.pendingTemplate`). `MenuBarHint` finds the `NSStatusBarWindow` and shows a borderless panel under it for 8 s. UI tests skip onboarding unless `--ui-testing-onboarding` is passed.
 - `LaunchAlerts` shows the corrupt-rules-file alert (with "Show File") and a notice for rules turned off because of unknown parts.
-- About tab uses a placeholder GitHub URL (`AppInfo.repositoryURL`); update it when the repo is public (Phase 7).
+- About tab links to the GitHub repo, https://github.com/petemcpherson/MFPete (`AppInfo.repositoryURL`, `AppInfo.licenseURL`).
 - UI tests for Activity and onboarding are written (`ActivityAndOnboardingUITests.swift`) but could not run in this environment ("Timed out while enabling automation mode").
 
 **Done when:** every v1 bullet in spec §16 except distribution works end to end.

@@ -13,6 +13,7 @@ public struct ActivityRecord: Hashable, Sendable {
     public var result: ActivityResultKind
     public var message: String?
     public var detail: String
+    public var runTrigger: RunTrigger
 
     public init(
         id: UUID = UUID(),
@@ -24,7 +25,8 @@ public struct ActivityRecord: Hashable, Sendable {
         destinationPath: String? = nil,
         result: ActivityResultKind,
         message: String? = nil,
-        detail: String = ""
+        detail: String = "",
+        runTrigger: RunTrigger = .fileEvent
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -36,6 +38,7 @@ public struct ActivityRecord: Hashable, Sendable {
         self.result = result
         self.message = message
         self.detail = detail
+        self.runTrigger = runTrigger
     }
 
     init(_ entry: ActivityEntry) {
@@ -49,8 +52,23 @@ public struct ActivityRecord: Hashable, Sendable {
             destinationPath: entry.destinationPath,
             result: entry.result,
             message: entry.message,
-            detail: entry.detail
+            detail: entry.detail,
+            runTrigger: RunTrigger(rawValue: entry.runTrigger) ?? .fileEvent
         )
+    }
+}
+
+/// Dashboard numbers for one rule, computed from the activity log.
+public struct RuleStats: Hashable, Sendable {
+    public var lastRun: Date?
+    /// Files acted on successfully, within the log's retention window.
+    public var fileCount: Int
+    public var lastError: ActivityRecord?
+
+    public init(lastRun: Date? = nil, fileCount: Int = 0, lastError: ActivityRecord? = nil) {
+        self.lastRun = lastRun
+        self.fileCount = fileCount
+        self.lastError = lastError
     }
 }
 
@@ -85,7 +103,8 @@ public actor ActivityStore {
                 destinationPath: record.destinationPath,
                 result: record.result,
                 message: record.message,
-                detail: record.detail
+                detail: record.detail,
+                runTrigger: record.runTrigger
             ))
         }
         try modelContext.save()
@@ -101,6 +120,35 @@ public actor ActivityStore {
         }
         descriptor.fetchLimit = limit
         return try modelContext.fetch(descriptor).map(ActivityRecord.init)
+    }
+
+    /// Rule stats for the dashboard, derived from the log (spec §9).
+    /// All entries for one file in one run share a timestamp, so the file
+    /// count is the number of distinct timestamps among successful entries.
+    public func stats(ruleID: UUID) throws -> RuleStats {
+        var newest = FetchDescriptor<ActivityEntry>(
+            predicate: #Predicate { $0.ruleID == ruleID },
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        newest.fetchLimit = 1
+        let lastRun = try modelContext.fetch(newest).first?.timestamp
+
+        let success = ActivityResultKind.success.rawValue
+        var succeeded = FetchDescriptor<ActivityEntry>(
+            predicate: #Predicate { $0.ruleID == ruleID && $0.resultKind == success }
+        )
+        succeeded.propertiesToFetch = [\.timestamp]
+        let fileCount = Set(try modelContext.fetch(succeeded).map(\.timestamp)).count
+
+        let failed = ActivityResultKind.failed.rawValue
+        var lastFailure = FetchDescriptor<ActivityEntry>(
+            predicate: #Predicate { $0.ruleID == ruleID && $0.resultKind == failed },
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        lastFailure.fetchLimit = 1
+        let lastError = try modelContext.fetch(lastFailure).first.map(ActivityRecord.init)
+
+        return RuleStats(lastRun: lastRun, fileCount: fileCount, lastError: lastError)
     }
 
     public func count() throws -> Int {

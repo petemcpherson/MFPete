@@ -1,12 +1,12 @@
 # MFPete: Implementation Plan
 
-> Source: `context/spec.md` (Final v1.0, 2026-10-01)
+> Source: `context/spec.md` (Final v1.1, 2026-10-01; adds D14 manual Run Now and D15 notifications + simple log)
 > Scope: v1 (MVP) as defined in spec §16. v1.x and v2 items are out of scope.
 
 ## Progress
 
 - [x] Phase 1: Project foundation and data layer
-- [ ] Phase 2: Rule engine core (conditions, actions, run pipeline)
+- [x] Phase 2: Rule engine core (conditions, actions, run pipeline)
 - [ ] Phase 3: Triggers, file watching, and engine safety
 - [ ] Phase 4: Menu bar and dashboard UI
 - [ ] Phase 5: Rule editor, preview, and templates
@@ -89,7 +89,7 @@ Goal: a menu bar app shell that launches with no dock icon, loads and saves rule
 - [x] `@Model ProcessedRecord` with a unique compound key (`ruleID` + `fileKey`) and `modifiedAt`.
 - [x] `ModelContainer` at `~/Library/Application Support/MFPete/MFPete.store`.
 - [x] `ActivityStore` and `ProcessedStore` as `@ModelActor` types so the engine actor can write off the main thread. UI reads through a main-context `@Query`.
-- [x] Retention pruning: delete entries older than 30 days or beyond 10,000 (configurable later in Phase 6).
+- [x] Retention pruning: delete entries older than 30 days or beyond 10,000 (fixed in v1, D15).
 
 ### 1.6 App shell
 - [x] `MFPeteApp` with `MenuBarExtra(.menu)` showing placeholder items and Quit.
@@ -109,84 +109,99 @@ Goal: a menu bar app shell that launches with no dock icon, loads and saves rule
 
 ---
 
-## Phase 2: Rule engine core (conditions, actions, run pipeline)
+## Phase 2: Rule engine core (conditions, actions, run pipeline) [COMPLETED]
 
 Goal: given a rule and a list of candidate files, the engine evaluates conditions and performs actions correctly, logging results. Triggered only by "Run Now" in this phase.
 
 ### 2.1 File snapshot
-- [ ] `FileSnapshot` struct built from `URL.resourceValues(forKeys:)`: name, extension, full name, isDirectory, isPackage, isSymlink/alias, `contentType` (UTType), `fileSize`, `totalFileAllocatedSize`, `addedToDirectoryDate`, `creationDate`, `contentModificationDate`, `tagNames`, `fileIdentifier` / volume UUID, ubiquitous/dataless status.
-- [ ] `Downloaded from`: read `com.apple.metadata:kMDItemWhereFroms` xattr with `getxattr`, decode binary plist into `[String]`.
-- [ ] `FileKey` builder: volume UUID + `fileIdentifierKey` (inode), path as fallback (spec §5.5).
+- [x] `FileSnapshot` struct built from `URL.resourceValues(forKeys:)`: name, extension, full name, isDirectory, isPackage, isSymlink/alias, `contentType` (UTType), `fileSize`, `totalFileAllocatedSize`, `addedToDirectoryDate`, `creationDate`, `contentModificationDate`, `tagNames`, `fileIdentifier` / volume UUID, ubiquitous/dataless status.
+- [x] `Downloaded from`: read `com.apple.metadata:kMDItemWhereFroms` xattr with `getxattr`, decode binary plist into `[String]`.
+- [x] `FileKey` builder: volume UUID + `fileIdentifierKey` (inode), path as fallback (spec §5.5).
 
 ### 2.2 Kind classification
-- [ ] `KindClassifier` maps `UTType` conformance to `FileKind`: Folder, Image, Movie, Audio, PDF, Text, Document, Archive, Disk Image, Application, Alias/Symlink, Other (spec §4.2).
-- [ ] Order matters (PDF before Document, Application before Folder for `.app` bundles). Document and test the precedence.
+- [x] `KindClassifier` maps `UTType` conformance to `FileKind`: Folder, Image, Movie, Audio, PDF, Text, Document, Archive, Disk Image, Application, Alias/Symlink, Other (spec §4.2).
+- [x] Order matters (PDF before Document, Application before Folder for `.app` bundles). Document and test the precedence.
 
 ### 2.3 Condition evaluation (spec §4)
-- [ ] `ConditionEvaluator.matches(_ group: ConditionGroup, snapshot:, now:) -> Bool`, recursive for any depth (D12: data model allows any depth).
-- [ ] Empty group = match all. `.all` = AND, `.any` = OR.
-- [ ] Text ops: is, is not, contains, does not contain, starts with, ends with, matches pattern (`*`, `?` wildcard via `fnmatch` or a small hand-written matcher). Case-insensitive by default.
-- [ ] Extension ops: is, is not, is any of (comma list, trimmed, dot stripped, lowercased).
-- [ ] Kind ops: is, is not.
-- [ ] Size ops: greater than / less than with KB/MB/GB (decide 1000 vs 1024: use 1000 to match Finder, document it).
-- [ ] Date ops: in the last N (min/hours/days/weeks/months), not in the last N, before date, after date. Use `Calendar` for months/weeks.
-- [ ] Tag ops: contains tag, does not contain tag, has no tags.
-- [ ] Downloaded from ops: contains, does not contain, is.
-- [ ] Any file: always true.
+- [x] `ConditionEvaluator.matches(_ group: ConditionGroup, snapshot:, now:) -> Bool`, recursive for any depth (D12: data model allows any depth).
+- [x] Empty group = match all. `.all` = AND, `.any` = OR.
+- [x] Text ops: is, is not, contains, does not contain, starts with, ends with, matches pattern (`*`, `?` wildcard via `fnmatch` or a small hand-written matcher). Case-insensitive by default.
+- [x] Extension ops: is, is not, is any of (comma list, trimmed, dot stripped, lowercased).
+- [x] Kind ops: is, is not.
+- [x] Size ops: greater than / less than with KB/MB/GB (decide 1000 vs 1024: use 1000 to match Finder, document it).
+- [x] Date ops: in the last N (min/hours/days/weeks/months), not in the last N, before date, after date. Use `Calendar` for months/weeks.
+- [x] Tag ops: contains tag, does not contain tag, has no tags.
+- [x] Downloaded from ops: contains, does not contain, is.
+- [x] Any file: always true.
 
 ### 2.4 Name patterns (spec §6.2)
-- [ ] `PatternRenderer.render(_ pattern: String, snapshot:, now:, counter:) -> String`.
-- [ ] Tokens: `{name}`, `{extension}`, `{fullname}`, `{date-added}`, `{date-created}`, `{date-modified}`, `{year}`, `{month}`, `{day}`, `{today}`, `{time}`, `{counter}`, `{folder}`, `{kind}`.
-- [ ] Replace `:` and `/` with `-` in rendered file names. For Sort into subfolder, split the pattern on `/` first so `{year}/{month}` creates nested folders, then sanitize each segment.
-- [ ] Unknown tokens render literally (and the editor flags them in Phase 5).
+- [x] `PatternRenderer.render(_ pattern: String, snapshot:, now:, counter:) -> String`.
+- [x] Tokens: `{name}`, `{extension}`, `{fullname}`, `{date-added}`, `{date-created}`, `{date-modified}`, `{year}`, `{month}`, `{day}`, `{today}`, `{time}`, `{counter}`, `{folder}`, `{kind}`.
+- [x] Replace `:` and `/` with `-` in rendered file names. For Sort into subfolder, split the pattern on `/` first so `{year}/{month}` creates nested folders, then sanitize each segment.
+- [x] Unknown tokens render literally (and the editor flags them in Phase 5).
 
 ### 2.5 Conflict resolution (spec §6.3)
-- [ ] `ConflictResolver.resolve(destination:, policy:) -> Resolution` (`.proceed(URL)`, `.replaceAfterTrashing(URL)`, `.skip`).
-- [ ] Keep both: Finder-style ` 2`, ` 3` before the extension. Handle names with no extension and multi-dot names (`archive.tar.gz` → treat last extension only, matching Finder).
-- [ ] Replace: trash the existing item first, never overwrite.
-- [ ] `{counter}` in a rename pattern takes priority over Keep both suffixing.
+- [x] `ConflictResolver.resolve(destination:, policy:) -> Resolution` (`.proceed(URL)`, `.replaceAfterTrashing(URL)`, `.skip`).
+- [x] Keep both: Finder-style ` 2`, ` 3` before the extension. Handle names with no extension and multi-dot names (`archive.tar.gz` → treat last extension only, matching Finder).
+- [x] Replace: trash the existing item first, never overwrite.
+- [x] `{counter}` in a rename pattern takes priority over Keep both suffixing.
 
 ### 2.6 Action execution (spec §6.1)
-- [ ] `ActionExecutor` protocol-based, one handler per action. Each returns `ActionOutcome { newURL?, destinationPath?, result }`.
-- [ ] Move to folder, Copy to folder (later actions keep the original), Rename, Change extension, Move to Trash (`FileManager.trashItem`), Sort into subfolder (create missing subfolders), Add tags / Remove tags (`URLResourceValues.tagNames`).
-- [ ] Unarchive (`.zip` only): run `/usr/bin/ditto -x -k <zip> <tempDir>` via `Process`, then move results into destination with conflict handling (Keep both). Optional trash of archive. Report extracted paths so Phase 3 can treat them as "added" files.
-- [ ] Open, Reveal in Finder, Show notification: go through a `WorkspaceService` / `NotificationService` protocol injected by the app target (keeps the package AppKit-free).
-- [ ] Wrap writes in `NSFileCoordinator` where another app might be writing (spec §5.7).
-- [ ] Missing destination folder → fail with clear message (auto-create is v1.x, spec §13). Exception: Sort into subfolder creates subfolders under an existing base.
-- [ ] Map errors: file vanished → `skipped`; permission denied → `failed` + rule marked "No permission"; disk full → `failed`.
+- [x] `ActionExecutor` protocol-based, one handler per action. Each returns `ActionOutcome { newURL?, destinationPath?, result }`.
+- [x] Move to folder, Copy to folder (later actions keep the original), Rename, Change extension, Move to Trash (`FileManager.trashItem`), Sort into subfolder (create missing subfolders), Add tags / Remove tags (`URLResourceValues.tagNames`).
+- [x] Unarchive (`.zip` only): run `/usr/bin/ditto -x -k <zip> <tempDir>` via `Process`, then move results into destination with conflict handling (Keep both). Optional trash of archive. Report extracted paths so Phase 3 can treat them as "added" files.
+- [x] Open, Reveal in Finder, Show notification: go through a `WorkspaceService` / `NotificationService` protocol injected by the app target (keeps the package AppKit-free).
+- [x] Wrap writes in `NSFileCoordinator` where another app might be writing (spec §5.7).
+- [x] Missing destination folder → fail with clear message (auto-create is v1.x, spec §13). Exception: Sort into subfolder creates subfolders under an existing base.
+- [x] Map errors: file vanished → `skipped`; permission denied → `failed` + rule marked "No permission"; disk full → `failed`.
 
 ### 2.7 Run pipeline (spec §2.1)
-- [ ] `RuleEngine` actor with `run(rule:, candidates:, reason:)`.
-- [ ] Candidate listing for full scans: direct children by default, recursive with "Include subfolders" (do not descend into packages; spec §5.2). Use `FileManager.enumerator` with `.skipsPackageDescendants` and prefetching resource keys.
-- [ ] `IgnoreFilter`: hidden files, `.DS_Store`, `Icon\r`, `.localized`, in-progress download patterns (spec §5.3, §5.4). Respect "Include hidden files".
-- [ ] Processed-record check (D6): skip a file if a record exists with `modifiedAt >= current contentModificationDate`. Write the record after the actions finish.
-- [ ] Multi-rule ordering (D5): when several rules share a candidate, run them in dashboard order. If a rule moved or trashed the file, later rules for that folder skip it. Honor "Stop processing other rules for matched files".
-- [ ] Per-file action chain: serial. If an action fails, stop remaining actions for that file and log.
-- [ ] Parallelism across files: `TaskGroup` with max 4 concurrent files (spec §5.7).
-- [ ] Self-change tracking: record paths the engine just created/modified with a short TTL so Phase 3 can suppress events for the producing rule (spec §5.4, §5.5).
-- [ ] Write one `ActivityEntry` per action, plus rule-level error entries.
-- [ ] Rule stats (last run, lifetime file count, last error) computed from activity log queries, not stored in JSON (spec §9).
-- [ ] Folder health check before each run: exists and readable, else mark rule "Folder missing" / "No permission" (spec §10).
+- [x] `RuleEngine` actor with `run(rule:, candidates:, reason:)`. `reason` is a `RunTrigger` (`fileEvent`, `scheduled`, `scheduledLate`, `manual`, `applyExisting`).
+- [x] Add `runTrigger` (raw `String`, default `"fileEvent"`) to the `ActivityEntry` model and `ActivityRecord` value copy. Every entry records why its run happened (D15).
+- [x] `runNow(ruleID:)` entry point (D14): full scan of scope, same path as a scheduled run, `reason: .manual`. Runs on disabled rules and while paused. Respects processed records. Rejects "File removed" rules. If the rule is already running, return `.alreadyRunning` (no queue).
+- [x] `RunSummary` returned from every run: counts of files acted on, skipped (already processed), skipped (other), failed, plus the dominant action verb for notification text ("moved to Trash"). Manual run with zero matches writes one "No matching files" entry.
+- [x] Candidate listing for full scans: direct children by default, recursive with "Include subfolders" (do not descend into packages; spec §5.2). Use `FileManager.enumerator` with `.skipsPackageDescendants` and prefetching resource keys.
+- [x] `IgnoreFilter`: hidden files, `.DS_Store`, `Icon\r`, `.localized`, in-progress download patterns (spec §5.3, §5.4). Respect "Include hidden files".
+- [x] Processed-record check (D6): skip a file if a record exists with `modifiedAt >= current contentModificationDate`. Write the record after the actions finish.
+- [x] Multi-rule ordering (D5): when several rules share a candidate, run them in dashboard order. If a rule moved or trashed the file, later rules for that folder skip it. Honor "Stop processing other rules for matched files".
+- [x] Per-file action chain: serial. If an action fails, stop remaining actions for that file and log.
+- [x] Parallelism across files: `TaskGroup` with max 4 concurrent files (spec §5.7).
+- [x] Self-change tracking: record paths the engine just created/modified with a short TTL so Phase 3 can suppress events for the producing rule (spec §5.4, §5.5).
+- [x] Write one `ActivityEntry` per action, plus rule-level error entries.
+- [x] Rule stats (last run, lifetime file count, last error) computed from activity log queries, not stored in JSON (spec §9).
+- [x] Folder health check before each run: exists and readable, else mark rule "Folder missing" / "No permission" (spec §10).
 
 ### 2.8 Dry run (for Preview)
-- [ ] `RuleEngine.plan(rule:)` returns `[PlannedFileResult { file, steps: [PlannedStep] }]` with predicted destination paths. No file system changes. Reuses evaluator, pattern renderer, and conflict resolver in simulation mode.
+- [x] `RuleEngine.plan(rule:)` returns `[PlannedFileResult { file, steps: [PlannedStep] }]` with predicted destination paths. No file system changes. Reuses evaluator, pattern renderer, and conflict resolver in simulation mode.
 
 ### 2.9 Rule summary sentence (D11)
-- [ ] `RuleSummarizer.sentence(for: rule)` → "When a file is added to Downloads, if its extension is dmg or zip, then move it to the Trash."
-- [ ] Short form for dashboard rows (two lines: trigger + conditions, actions).
-- [ ] Put this in `MFPeteCore` so it is unit tested; use `String(localized:)` for fragments.
+- [x] `RuleSummarizer.sentence(for: rule)` → "When a file is added to Downloads, if its extension is dmg or zip, then move it to the Trash."
+- [x] Short form for dashboard rows (two lines: trigger + conditions, actions).
+- [x] Put this in `MFPeteCore` so it is unit tested; use `String(localized:)` for fragments.
 
 ### 2.10 Tests (spec §15)
-- [ ] Every attribute × operator combination, using temp files with set dates/tags/xattrs.
-- [ ] Nested groups (All containing Any).
-- [ ] Pattern rendering for every token and sanitization.
-- [ ] Conflict naming: Keep both, Replace (goes to Trash), Skip; names without extension.
-- [ ] Each action against a temp directory, including Unarchive of a Finder-style zip and a corrupt zip.
-- [ ] Once-per-file record: second run does nothing; modifying the file makes it eligible again.
-- [ ] D5 ordering and "stop other rules".
-- [ ] Summary sentence snapshots for each template rule.
+- [x] Every attribute × operator combination, using temp files with set dates/tags/xattrs.
+- [x] Nested groups (All containing Any).
+- [x] Pattern rendering for every token and sanitization.
+- [x] Conflict naming: Keep both, Replace (goes to Trash), Skip; names without extension.
+- [x] Each action against a temp directory, including Unarchive of a Finder-style zip and a corrupt zip.
+- [x] Once-per-file record: second run does nothing; modifying the file makes it eligible again.
+- [x] `runNow` on a disabled rule and while paused still runs; on a "File removed" rule is rejected; `RunSummary` counts and "No matching files" entry are correct.
+- [x] D5 ordering and "stop other rules".
+- [x] Summary sentence snapshots for each template rule.
 
-**Done when:** a headless test can build a rule, point it at a temp folder, call Run Now, and verify the files moved/renamed/tagged and the activity entries written.
+**Implementation notes (decisions made in Phase 2):**
+- "Contains tag" matches any listed tag; "does not contain tag" matches none of them.
+- "Before date" = earlier than the start of that day; "after date" = on or after the start of the next day.
+- Size conditions never match folders/packages (folder size is v2).
+- `{counter}` starts at 1 and counts up until the name is free; it overrides the conflict policy.
+- A skipped action (name exists, file vanished) stops the chain like a failure. Failed files are not marked processed, so they retry next run.
+- All activity entries for one file in one rule run share a timestamp; `ActivityStore.stats(ruleID:)` counts files as distinct successful timestamps.
+- Rule-level folder errors are logged only when the rule's status changes, to avoid log spam on every scheduled run.
+- `RuleEngine.scanAndRun(_:reason:)` is the full-scan entry point Phase 3 scheduled runs and apply-to-existing should reuse; `run(rules:candidates:reason:)` is the file-event entry point (D5 ordering).
+- `RuleEngine.selfChangeProducer(of:)` exposes self-change tracking (10 s TTL) for Phase 3.
+
+**Done when:** a headless test can build a rule, point it at a temp folder, call `runNow`, and verify the files moved/renamed/tagged, the activity entries written (with `runTrigger = manual`), and the `RunSummary` returned.
 
 ---
 
@@ -230,7 +245,9 @@ Goal: rules fire automatically from file events and schedules, safely, with loop
 ### 3.6 Safety
 - [ ] Loop guard (spec §5.6): track runs per file key over 60 s. Over 10 runs → stop the chain, log "Possible rule loop between Rule A and Rule B", send notification. Disable nothing.
 - [ ] Bulk guard: if one run would act on more than the threshold (default 50), pause and emit a `BulkApprovalRequest` to the UI (Preview / Run / Cancel). Not applied to the first-enable prompt.
-- [ ] Global pause: engine flag. Events received while paused are discarded. On resume, UI offers "Scan now" for file-event rules.
+- [ ] Global pause: engine flag. Events received while paused are discarded. On resume, UI offers "Scan now" for file-event rules. Manual `runNow` ignores the pause flag (D14).
+- [ ] Bulk guard also applies to manual runs.
+- [ ] Manual runs do not touch `lastScheduledRun` or the next fire date.
 - [ ] Apply-to-existing on enable (spec §3.4): when a file-event rule is created or enabled, engine counts current matches and emits a request to the UI (Preview / Apply / Only new files, default Only new files). "Only new files" writes processed records for current files so they are skipped.
 - [ ] "Run Again on All Files" per rule: delete that rule's processed records (D6).
 
@@ -248,18 +265,21 @@ Goal: rules fire automatically from file events and schedules, safely, with loop
 Goal: the user can see, toggle, reorder, search, run, duplicate, and delete rules, and the menu bar reflects live state.
 
 ### 4.1 App ↔ engine bridge
-- [ ] `EngineController` (`@MainActor @Observable`) owns the `RuleEngine` actor, pushes rule changes to it, and exposes UI state: paused, per-rule status (OK / error / folder missing / no permission), pending bulk/apply requests, recent activity.
+- [ ] `EngineController` (`@MainActor @Observable`) owns the `RuleEngine` actor, pushes rule changes to it, and exposes UI state: paused, per-rule status (OK / error / folder missing / no permission), per-rule `isRunning`, pending bulk/apply requests, recent activity.
+- [ ] `EngineController.runNow(_ ruleID:)` used by every Run Now entry point (row button, row menu, menu bar submenu, editor Save & Run). Hands the `RunSummary` to `NotificationService` (Phase 6.2).
 - [ ] Error badge clears on the next successful run or when the user opens the rule (spec §13).
 
 ### 4.2 Menu bar extra (spec §8.1)
 - [ ] Header: "MFPete — N rules active" (disabled item).
 - [ ] Recent activity: last 3–5 entries with relative time; click reveals in Finder.
 - [ ] Pause all rules (⌘P), Run rule ▸ submenu, Open Rules… (⌘R), Settings… (⌘,), Quit (⌘Q).
+- [ ] Run rule ▸ lists all rules, including disabled ones (D14). "File removed" rules show disabled. Feedback comes from the summary notification, since no window is open.
 - [ ] Icon: template SF Symbol `tray.and.arrow.down`; paused variant; badge dot when any rule has an unresolved error.
 - [ ] Opening a window from the menu activates the app (accessory mode).
 
 ### 4.3 Dashboard window (spec §8.2)
 - [ ] Single `List` with custom rows: toggle, name, summary (2 lines from `RuleSummarizer`), last run, lifetime file count, error badge.
+- [ ] Run Now button on every row (D14, spec §3.3): `play.fill` borderless button, always visible, left of `⋯`. Shows a `ProgressView` spinner while `isRunning`. Disabled with tooltip for "File removed" rules. VoiceOver label "Run <rule name> now". "Last run" updates when the run finishes.
 - [ ] Row `⋯` menu: Edit, Run Now, Preview Matches, Duplicate, Export…, Show Activity, Run Again on All Files, Delete (confirm).
 - [ ] Double-click / Return opens editor (editor itself comes in Phase 5; stub sheet for now).
 - [ ] Drag to reorder (`.onMove`) updates `order` and persists (D5).
@@ -269,7 +289,7 @@ Goal: the user can see, toggle, reorder, search, run, duplicate, and delete rule
 - [ ] Keyboard navigation and VoiceOver labels on rows and controls.
 
 ### 4.4 Tests
-- [ ] UI test: toggle a rule, reorder, delete with confirmation.
+- [ ] UI test: toggle a rule, reorder, delete with confirmation, click Run Now and see "Last run" update.
 - [ ] Unit tests for search/filter/sort logic (pure functions in a view model).
 
 **Done when:** user manages rules entirely from the dashboard and menu bar (except editing), and state survives relaunch.
@@ -283,7 +303,8 @@ Goal: the When / If / Then editor (D11) with live summary, live match count, pre
 ### 5.1 Editor structure (spec §8.3)
 - [ ] Sheet over the dashboard. Works on a draft copy of the rule; Save writes back; Cancel discards (confirm if dirty). ⌘S saves, Esc cancels.
 - [ ] Header: name field (auto-generated until the user edits it) + live summary sentence.
-- [ ] Footer: "More options" disclosure (stop other rules, notify on each run, notes), Cancel, Save Rule.
+- [ ] Footer: "More options" disclosure (stop other rules, notify on each run, notes), Cancel, Save & Run, Save Rule.
+- [ ] Save & Run (D14): validate, save, close the sheet, then call `EngineController.runNow`. Disabled for "File removed" rules.
 
 ### 5.2 WHEN card
 - [ ] Trigger popup: File added (default), Schedule options, and "More triggers" disclosure for File modified / File removed (spec §3.1).
@@ -333,24 +354,29 @@ Goal: the When / If / Then editor (D11) with live summary, live match count, pre
 
 Goal: complete the remaining v1 surfaces so the app is trustworthy and self-explanatory.
 
-### 6.1 Activity log window (spec §8.4)
-- [ ] `Window("Activity", id: "activity")` with a `Table`: Time, Rule, Action, File, Result (✓ / ⚠︎ / ✕), Details.
-- [ ] Filters: by rule, by result. Opening from a rule's "Show Activity" pre-filters.
-- [ ] Row actions: Reveal in Finder (if file exists), Copy path, Open rule.
-- [ ] "Clear log" (confirm). Retention settings applied by the pruning task.
+### 6.1 Activity log window (spec §8.4, D15: keep it simple)
+- [ ] `Window("Activity", id: "activity")` with a `Table`, newest first: Time, Rule, Trigger (File event / Scheduled / Ran late / Manual), Action, File, Result (✓ / ⚠︎ / ✕). Failure/skip message as a second line under the file name.
+- [ ] Filters: Rule popup (All rules / one rule) and an "Errors only" toggle. Opening from a rule's "Show Activity" or from a notification click pre-selects the rule.
+- [ ] Row context menu: Reveal in Finder (if file exists), Copy path.
+- [ ] "Clear log" (confirm). Retention is fixed (30 days / 10,000 entries); pruning runs at launch and daily.
 - [ ] Efficient queries with `FetchDescriptor` limits and sort by timestamp (10,000 rows max).
 
-### 6.2 Notifications
-- [ ] `NotificationService` using `UNUserNotificationCenter`.
-- [ ] Global setting: Off / Errors only (default) / Every run.
-- [ ] Per-rule "Notify on each run" summary ("Clean Downloads: 3 files moved to Trash").
-- [ ] Show notification action, loop-guard alert, disk-full and missing-destination errors.
+### 6.2 Notifications (spec §8.8, D15)
+- [ ] `NotificationService` using `UNUserNotificationCenter`. Takes `RunSummary` values from `EngineController`.
+- [ ] One summary per run, never per file ("Clean Downloads: 3 files moved to Trash", "Sort by type: 5 files processed, 1 failed", "…: No matching files" for manual runs).
+- [ ] `NotificationPolicy.shouldNotify(level:, rule:, summary:) -> Bool` as a pure function in `MFPeteCore`, implementing the spec §8.8 table (Off / Errors only / Every run × automatic / manual / error). Automatic runs with 0 files acted on never notify.
+- [ ] Coalescing: merge file-event summaries for the same rule within a 5 s window into one notification (sum the counts). Same for errors.
+- [ ] Per-rule "Notify on each run" forces summaries under "Errors only".
+- [ ] "Show notification" action fires at every level, including Off.
+- [ ] Loop-guard alert, disk-full and missing-destination errors go through the same error path.
+- [ ] Notification click (`UNUserNotificationCenterDelegate`) opens the Activity window filtered to that rule (rule ID in `userInfo`).
 - [ ] App works fully without notification permission.
+- [ ] Unit tests: every row of the policy table, coalescing window, summary text.
 
 ### 6.3 Settings scene (spec §8.5)
 - [ ] **General:** Launch at login (`SMAppService.mainApp.register()/unregister()`, reflect real status including "Requires approval"); Show icon in Dock (`NSApp.setActivationPolicy(.regular/.accessory)`, persisted, applied at launch); Notifications level.
 - [ ] **Folders:** list of all scope folders, the rules using each, status (OK / missing / no permission / unavailable), Reveal in Finder, "Open Privacy & Security" button (`x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders`).
-- [ ] **Advanced:** settle delay (1–30 s), bulk guard threshold, log retention (days + max entries), Export all rules, Import rules, Reset processed-file history (confirm).
+- [ ] **Advanced:** settle delay (1–30 s), bulk guard threshold, Export all rules, Import rules, Reset processed-file history (confirm). No log retention setting in v1 (D15).
 - [ ] **About:** version, MIT license, GitHub link. Sparkle controls come in Phase 7 (leave a placeholder).
 
 ### 6.4 Import / export (spec §9)
@@ -422,3 +448,4 @@ Goal: signed, notarized builds on GitHub Releases, Sparkle updates, Homebrew cas
 - **Template 1 ambiguity:** spec mixes "file added" with a daily schedule. Plan uses a daily schedule rule (Phase 5.7).
 - **Homebrew notability:** official `homebrew/cask` may reject a brand-new app. Fallback: a personal tap until notability is met.
 - **`fileIdentifierKey` availability:** listed as macOS 13.3+; deployment target 14 covers it.
+- **`ActivityEntry.runTrigger` added after Phase 1:** new stored property with a default value, so SwiftData lightweight migration handles existing dev stores. No shipped users yet, so no migration plan needed.

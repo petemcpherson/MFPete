@@ -26,6 +26,8 @@ public final class ActivityEntry {
     public var message: String?
     /// Extra free-form detail for the log's Details column.
     public var detail: String
+    /// Raw value of `RunTrigger`: why the run happened (D15).
+    public var runTrigger: String = "fileEvent"
 
     public init(
         id: UUID = UUID(),
@@ -37,7 +39,8 @@ public final class ActivityEntry {
         destinationPath: String? = nil,
         result: ActivityResultKind,
         message: String? = nil,
-        detail: String = ""
+        detail: String = "",
+        runTrigger: RunTrigger = .fileEvent
     ) {
         self.id = id
         self.timestamp = timestamp
@@ -49,6 +52,7 @@ public final class ActivityEntry {
         self.resultKind = result.rawValue
         self.message = message
         self.detail = detail
+        self.runTrigger = runTrigger.rawValue
     }
 
     public var result: ActivityResultKind {

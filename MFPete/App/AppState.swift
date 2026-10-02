@@ -17,11 +17,21 @@ final class AppState {
     var lastSaveError: String?
     /// Expands `~` in template folders. UI tests point it at a temporary folder.
     var templateHome = FolderRef.homePath
+    /// Set to open the Activity window filtered to a rule (nil = all rules).
+    /// A new value each time, so asking for the same rule twice still works.
+    var activityRequest: ActivityRequest?
+    /// A template the Rules window should open in the editor (onboarding).
+    var pendingTemplate: RuleTemplate?
+    /// Settings › General › Show icon in Dock (spec §11).
+    private(set) var showsDockIcon: Bool
+    private(set) var hasCompletedOnboarding: Bool
 
     /// Runs rules and mirrors engine state for the UI.
     let engineController: EngineController
     @ObservationIgnored let modelContainer: ModelContainer
     @ObservationIgnored private let rulesStore: RulesStore
+    @ObservationIgnored let defaults: UserDefaults
+    @ObservationIgnored private var pruneTask: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "com.mftpete.MFPete", category: "AppState")
     /// Set by a scene view, so code outside SwiftUI (the app delegate) can
     /// open windows. A window asked for before then opens once it is set.
@@ -40,6 +50,9 @@ final class AppState {
         defaults: UserDefaults = .standard
     ) {
         self.rulesStore = rulesStore
+        self.defaults = defaults
+        self.showsDockIcon = defaults.bool(forKey: SettingsKey.showDockIcon)
+        self.hasCompletedOnboarding = defaults.bool(forKey: SettingsKey.hasCompletedOnboarding)
         self.modelContainer = modelContainer ?? AppState.makeModelContainer()
         engineController = EngineController(modelContainer: self.modelContainer, defaults: defaults)
 
@@ -106,6 +119,17 @@ final class AppState {
         return copy
     }
 
+    /// Imported rules go to the end of the order (spec §9).
+    func append(_ imported: [Rule]) {
+        guard !imported.isEmpty else { return }
+        for rule in imported {
+            var rule = rule
+            rule.order = rules.count
+            rules.append(rule)
+        }
+        persist()
+    }
+
     func delete(_ ids: Set<Rule.ID>) {
         rules.removeAll { ids.contains($0.id) }
         renumber()
@@ -148,12 +172,44 @@ final class AppState {
         AppActivation.bringToFront()
     }
 
+    /// Opens the Activity window, filtered to one rule or showing all.
+    func showActivity(ruleID: Rule.ID? = nil) {
+        activityRequest = ActivityRequest(ruleID: ruleID)
+        openWindow(WindowID.activity)
+    }
+
+    /// Opens the Rules window with a template in the editor.
+    func startNewRule(from template: RuleTemplate) {
+        pendingTemplate = template
+        openWindow(WindowID.rules)
+    }
+
+    // MARK: - Settings
+
+    func setShowsDockIcon(_ show: Bool) {
+        showsDockIcon = show
+        defaults.set(show, forKey: SettingsKey.showDockIcon)
+        AppActivation.applyActivationPolicy(showDockIcon: show)
+        // Changing the policy can send the Settings window behind other apps.
+        DispatchQueue.main.async { AppActivation.bringToFront() }
+    }
+
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
+        defaults.set(true, forKey: SettingsKey.hasCompletedOnboarding)
+    }
+
     // MARK: - Activity log
 
-    func pruneActivityLog() {
+    /// Prunes now and once a day while the app runs (fixed retention, D15).
+    func startActivityPruning() {
         let store = ActivityStore(modelContainer: modelContainer)
-        Task.detached(priority: .utility) {
-            try? await store.prune()
+        pruneTask?.cancel()
+        pruneTask = Task.detached(priority: .utility) {
+            while !Task.isCancelled {
+                try? await store.prune()
+                try? await Task.sleep(for: .seconds(24 * 60 * 60))
+            }
         }
     }
 
@@ -172,11 +228,14 @@ final class AppState {
     }
 }
 
-/// `UserDefaults` keys for app and engine settings (Settings › Advanced, Phase 6).
+/// `UserDefaults` keys for app and engine settings (spec §8.5).
 enum SettingsKey {
     static let settleDelay = "settleDelay"
     static let bulkThreshold = "bulkGuardThreshold"
     static let isPaused = "isPaused"
+    static let notificationLevel = "notificationLevel"
+    static let showDockIcon = "showDockIcon"
+    static let hasCompletedOnboarding = "hasCompletedOnboarding"
 }
 
 enum AppActivation {
@@ -185,4 +244,15 @@ enum AppActivation {
     static func bringToFront() {
         NSApp.activate()
     }
+
+    /// Accessory (menu bar only) unless "Show icon in Dock" is on (spec §11).
+    static func applyActivationPolicy(showDockIcon: Bool) {
+        NSApp.setActivationPolicy(showDockIcon ? .regular : .accessory)
+    }
+}
+
+/// "Show the Activity window for this rule" (nil = all rules).
+struct ActivityRequest: Equatable {
+    let id = UUID()
+    var ruleID: Rule.ID?
 }

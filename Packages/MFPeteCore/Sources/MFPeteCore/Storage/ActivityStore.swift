@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// Value copy of an `ActivityEntry`, safe to pass between actors.
-public struct ActivityRecord: Hashable, Sendable {
+public struct ActivityRecord: Identifiable, Hashable, Sendable {
     public var id: UUID
     public var timestamp: Date
     public var ruleID: UUID
@@ -72,7 +72,7 @@ public struct RuleStats: Hashable, Sendable {
     }
 }
 
-/// How long activity entries are kept (spec §8.4). Configurable in Phase 6.
+/// How long activity entries are kept (spec §8.4). Fixed in v1 (D15).
 public struct RetentionPolicy: Hashable, Sendable {
     public var maxAge: TimeInterval
     public var maxEntries: Int
@@ -117,6 +117,29 @@ public actor ActivityStore {
         )
         if let ruleID {
             descriptor.predicate = #Predicate { $0.ruleID == ruleID }
+        }
+        descriptor.fetchLimit = limit
+        return try modelContext.fetch(descriptor).map(ActivityRecord.init)
+    }
+
+    /// Entries for the Activity window, newest first (spec §8.4).
+    /// - Parameters:
+    ///   - ruleID: only this rule's entries, or all when nil.
+    ///   - errorsOnly: only failed entries.
+    public func entries(ruleID: UUID? = nil, errorsOnly: Bool = false, limit: Int = RetentionPolicy().maxEntries) throws -> [ActivityRecord] {
+        var descriptor = FetchDescriptor<ActivityEntry>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+        let failed = ActivityResultKind.failed.rawValue
+        switch (ruleID, errorsOnly) {
+        case let (ruleID?, true):
+            descriptor.predicate = #Predicate { $0.ruleID == ruleID && $0.resultKind == failed }
+        case let (ruleID?, false):
+            descriptor.predicate = #Predicate { $0.ruleID == ruleID }
+        case (nil, true):
+            descriptor.predicate = #Predicate { $0.resultKind == failed }
+        case (nil, false):
+            break
         }
         descriptor.fetchLimit = limit
         return try modelContext.fetch(descriptor).map(ActivityRecord.init)

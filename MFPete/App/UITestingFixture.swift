@@ -11,6 +11,8 @@ import SwiftData
 enum UITestingFixture {
     static let launchArgument = "--ui-testing"
     static let emptyArgument = "--ui-testing-empty"
+    /// Shows the first-launch window instead of the Rules window.
+    static let onboardingArgument = "--ui-testing-onboarding"
 
     static var isActive: Bool {
         ProcessInfo.processInfo.arguments.contains(launchArgument)
@@ -61,7 +63,9 @@ enum UITestingFixture {
         let container = try? DataStore.makeInMemoryContainer()
         let state = AppState(rulesStore: store, modelContainer: container, defaults: defaults)
         state.templateHome = root.path
-        state.openWindow(WindowID.rules)
+        if !ProcessInfo.processInfo.arguments.contains(onboardingArgument) {
+            state.openWindow(WindowID.rules)
+        }
         return state
     }
 }

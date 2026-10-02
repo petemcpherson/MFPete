@@ -82,9 +82,10 @@ struct MenuBarContent: View {
                 Text("No activity yet")
             } else {
                 ForEach(controller.recentActivity, id: \.id) { record in
-                    Button(record.menuTitle) { reveal(record) }
+                    Button(record.menuTitle) { ActivityFile.reveal(record) }
                 }
             }
+            Button("Show Activity…") { appState.showActivity() }
         }
 
         Divider()
@@ -130,16 +131,6 @@ struct MenuBarContent: View {
             NSApp.terminate(nil)
         }
         .keyboardShortcut("q")
-    }
-
-    /// Clicking an activity item reveals the file in Finder (spec §8.1).
-    private func reveal(_ record: ActivityRecord) {
-        let candidates = [record.destinationPath, record.sourcePath].compactMap { $0 }
-        guard let path = candidates.first(where: { FileManager.default.fileExists(atPath: $0) }) else {
-            NSSound.beep()
-            return
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)])
     }
 }
 

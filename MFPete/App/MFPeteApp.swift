@@ -28,6 +28,19 @@ struct MFPeteApp: App {
         }
         .modelContainer(appDelegate.appState.modelContainer)
 
+        Window("Activity", id: WindowID.activity) {
+            ActivityWindow()
+                .environment(appDelegate.appState)
+        }
+        .defaultSize(width: 860, height: 480)
+
+        Window("Welcome to MFPete", id: WindowID.onboarding) {
+            OnboardingWindow()
+                .environment(appDelegate.appState)
+        }
+        .windowResizability(.contentSize)
+        .windowStyle(.hiddenTitleBar)
+
         Settings {
             SettingsView()
                 .environment(appDelegate.appState)
@@ -37,4 +50,6 @@ struct MFPeteApp: App {
 
 enum WindowID {
     static let rules = "rules"
+    static let activity = "activity"
+    static let onboarding = "onboarding"
 }

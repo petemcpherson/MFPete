@@ -154,6 +154,12 @@ extension RuleEngine {
         try? await processedStore.reset(ruleID: ruleID)
     }
 
+    /// Settings › Advanced › "Reset processed-file history": every rule
+    /// re-evaluates existing files on its next run.
+    public func resetAllProcessed() async {
+        try? await processedStore.resetAll()
+    }
+
     // MARK: - Volumes (spec §11)
 
     /// Marks rules with a folder on the volume as unavailable (unmounted)

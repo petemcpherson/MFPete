@@ -3,7 +3,7 @@ import SwiftUI
 
 /// Things the user can do to one rule from its row.
 enum RuleCommand {
-    case edit, runNow, preview, duplicate, export, runAgainOnAllFiles, delete
+    case edit, runNow, preview, duplicate, export, showActivity, runAgainOnAllFiles, delete
 }
 
 /// One dashboard row (spec §8.2): toggle, name, two-line summary, last run
@@ -123,9 +123,7 @@ struct RuleMenuItems: View {
         Divider()
         Button("Duplicate") { onCommand(.duplicate) }
         Button("Export…") { onCommand(.export) }
-        // The Activity window arrives with the activity log (Phase 6).
-        Button("Show Activity") {}
-            .disabled(true)
+        Button("Show Activity") { onCommand(.showActivity) }
         Divider()
         Button("Run Again on All Files") { onCommand(.runAgainOnAllFiles) }
             .disabled(!canRun)
@@ -154,17 +152,34 @@ private struct RunInfo: View {
     }
 }
 
-/// Error or unavailable badge next to the rule name.
+/// Error or unavailable badge next to the rule name. "No permission"
+/// opens Privacy & Security › Files and Folders (spec §10).
 private struct StatusBadge: View {
     let status: RuleStatus
 
     var body: some View {
         if let message = status.message {
-            Image(systemName: status.isError ? "exclamationmark.triangle.fill" : "externaldrive.badge.xmark")
-                .foregroundStyle(status.isError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
-                .help(message)
+            if case .noPermission = status {
+                Button {
+                    SystemSettingsLink.openFilesAndFolders()
+                } label: {
+                    icon
+                }
+                .buttonStyle(.borderless)
+                .help(String(localized: "\(message). Click to open Privacy & Security."))
                 .accessibilityLabel(Text(message))
+                .accessibilityHint(Text("Opens Privacy & Security settings"))
+            } else {
+                icon
+                    .help(message)
+                    .accessibilityLabel(Text(message))
+            }
         }
+    }
+
+    private var icon: some View {
+        Image(systemName: status.isError ? "exclamationmark.triangle.fill" : "externaldrive.badge.xmark")
+            .foregroundStyle(status.isError ? AnyShapeStyle(.orange) : AnyShapeStyle(.secondary))
     }
 }
 

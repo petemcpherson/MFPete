@@ -1,5 +1,6 @@
 import AppKit
 import MFPeteCore
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = UITestingFixture.isActive ? UITestingFixture.makeAppState() : AppState()
@@ -14,9 +15,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         SingleInstance.observeOpenRequests { [weak self] in
             self?.appState.openWindow(WindowID.rules)
         }
-        appState.pruneActivityLog()
+        AppActivation.applyActivationPolicy(showDockIcon: appState.showsDockIcon)
+        setUpNotifications()
+        appState.startActivityPruning()
         appState.engineController.start()
         observeWorkspace()
+        LaunchAlerts.show(for: appState)
+        if !appState.hasCompletedOnboarding && OnboardingWindow.shouldShowAtLaunch {
+            appState.openWindow(WindowID.onboarding)
+        }
+    }
+
+    private var notificationHandler: NotificationClickHandler?
+
+    /// Clicking a notification opens the Activity log for its rule (spec §8.8).
+    private func setUpNotifications() {
+        let appState = appState
+        let handler = NotificationClickHandler { ruleID in
+            appState.showActivity(ruleID: ruleID)
+        }
+        notificationHandler = handler
+        UNUserNotificationCenter.current().delegate = handler
     }
 
     /// Lets the engine finish pending events and save its watcher position.

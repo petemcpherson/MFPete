@@ -26,6 +26,15 @@ final class EngineController {
     private(set) var applyRequests: [ApplyExistingRequest] = []
     /// Set on resume: offer "Scan now" for files added while paused.
     var offerScanAfterResume = false
+    /// Every scope folder with its health (Settings › Folders).
+    private(set) var folderUsages: [FolderUsage] = []
+    /// Bumped on every refresh, so the Activity window reloads.
+    private(set) var activityRevision = 0
+    /// Settings › General › Notifications (spec §8.8).
+    private(set) var notificationLevel: NotificationLevel
+    /// Settings › Advanced (spec §8.5).
+    private(set) var settleDelay: TimeInterval
+    private(set) var bulkThreshold: Int
 
     static let recentActivityLimit = 5
 
@@ -34,7 +43,7 @@ final class EngineController {
     /// Called when a prompt needs an open Rules window.
     @ObservationIgnored var onPromptNeeded: (() -> Void)?
     @ObservationIgnored private let activityStore: ActivityStore
-    @ObservationIgnored private let notifier: any RunNotifier
+    @ObservationIgnored let notifier: any RunNotifier
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var rules: [Rule] = []
     /// Rule pushes run in order, each after the previous one finished.
@@ -45,28 +54,32 @@ final class EngineController {
     init(
         modelContainer: ModelContainer,
         defaults: UserDefaults = .standard,
-        notifier: any RunNotifier = LoggingRunNotifier()
+        notifier: (any RunNotifier)? = nil
     ) {
         self.defaults = defaults
-        self.notifier = notifier
+        self.notifier = notifier ?? SummaryNotifier()
         self.activityStore = ActivityStore(modelContainer: modelContainer)
         self.isPaused = defaults.bool(forKey: SettingsKey.isPaused)
+        self.notificationLevel = defaults.string(forKey: SettingsKey.notificationLevel)
+            .flatMap(NotificationLevel.init(rawValue:)) ?? .default
 
         let threshold = defaults.object(forKey: SettingsKey.bulkThreshold) as? Int
             ?? RuleEngine.Configuration.defaultBulkThreshold
-        let settleDelay = defaults.object(forKey: SettingsKey.settleDelay) as? Double ?? Settler.defaultDelay
+        let bulkThreshold = max(threshold, Self.bulkThresholdRange.lowerBound)
+        self.bulkThreshold = bulkThreshold
+        let storedDelay = defaults.object(forKey: SettingsKey.settleDelay) as? Double ?? Settler.defaultDelay
+        let settleDelay = min(max(storedDelay, Settler.delayRange.lowerBound), Settler.delayRange.upperBound)
+        self.settleDelay = settleDelay
         engine = RuleEngine(
             activityStore: ActivityStore(modelContainer: modelContainer),
             processedStore: ProcessedStore(modelContainer: modelContainer),
-            environment: ActionEnvironment(workspace: AppWorkspaceService()),
-            configuration: RuleEngine.Configuration(bulkThreshold: threshold)
+            environment: ActionEnvironment(workspace: AppWorkspaceService(), notifier: ActionNotificationPoster()),
+            configuration: RuleEngine.Configuration(bulkThreshold: bulkThreshold)
         )
         triggers = TriggerCoordinator(
             engine: engine,
             state: UserDefaultsEngineState(defaults: defaults),
-            configuration: TriggerCoordinator.Configuration(
-                settleDelay: min(max(settleDelay, Settler.delayRange.lowerBound), Settler.delayRange.upperBound)
-            )
+            configuration: TriggerCoordinator.Configuration(settleDelay: settleDelay)
         )
 
         let triggers = triggers
@@ -143,6 +156,50 @@ final class EngineController {
         }
     }
 
+    // MARK: - Settings
+
+    static let bulkThresholdRange = 5...10_000
+
+    func setNotificationLevel(_ level: NotificationLevel) {
+        notificationLevel = level
+        defaults.set(level.rawValue, forKey: SettingsKey.notificationLevel)
+    }
+
+    func setSettleDelay(_ seconds: TimeInterval) {
+        let seconds = min(max(seconds, Settler.delayRange.lowerBound), Settler.delayRange.upperBound)
+        guard seconds != settleDelay else { return }
+        settleDelay = seconds
+        defaults.set(seconds, forKey: SettingsKey.settleDelay)
+        enqueue { triggers in await triggers.setSettleDelay(seconds) }
+    }
+
+    func setBulkThreshold(_ threshold: Int) {
+        let threshold = min(max(threshold, Self.bulkThresholdRange.lowerBound), Self.bulkThresholdRange.upperBound)
+        guard threshold != bulkThreshold else { return }
+        bulkThreshold = threshold
+        defaults.set(threshold, forKey: SettingsKey.bulkThreshold)
+        let engine = engine
+        Task { await engine.setBulkThreshold(threshold) }
+    }
+
+    /// Settings › Advanced: every rule re-evaluates existing files on its next run.
+    func resetAllProcessed() async {
+        await settle()
+        await engine.resetAllProcessed()
+    }
+
+    // MARK: - Activity log
+
+    /// Entries for the Activity window, newest first.
+    func activityEntries(ruleID: Rule.ID?, errorsOnly: Bool) async -> [ActivityRecord] {
+        (try? await activityStore.entries(ruleID: ruleID, errorsOnly: errorsOnly)) ?? []
+    }
+
+    func clearActivityLog() async {
+        try? await activityStore.deleteAll()
+        await refresh()
+    }
+
     // MARK: - Run Now (D14)
 
     /// Every Run Now entry point ends here: row button, row menu, menu bar
@@ -155,7 +212,7 @@ final class EngineController {
         runningRuleIDs.remove(id)
         switch result {
         case .completed(let summary):
-            notifier.runFinished(summary)
+            notify(summary)
         case .needsApproval(let request):
             addBulkRequest(request)
         case .alreadyRunning, .ruleNotFound, .notAvailableForFileRemoved, .unsupportedElements:
@@ -183,7 +240,7 @@ final class EngineController {
         bulkRequests.removeAll { $0.id == request.id }
         Task {
             if let summary = await engine.resolveBulkApproval(request.id, approve: approve) {
-                notifier.runFinished(summary)
+                notify(summary)
             }
             await refresh()
         }
@@ -222,19 +279,32 @@ final class EngineController {
 
     // MARK: - Refresh
 
-    /// Re-reads statuses from the engine and stats from the activity log.
+    /// Re-reads statuses from the engine, checks every scope folder, and
+    /// reads stats from the activity log. The engine's status wins; a rule
+    /// it has not flagged still shows a missing or unreadable folder, so
+    /// disabled and imported rules get badges too (spec §10).
     func refresh() async {
-        let ids = rules.map(\.id)
+        let rules = rules
+        let usages = await Task.detached(priority: .utility) {
+            FolderStatusChecker.usages(for: rules)
+        }.value
+        let folderStatuses = FolderStatusChecker.ruleStatuses(from: usages, rules: rules)
         var newStatuses: [Rule.ID: RuleStatus] = [:]
         var newStats: [Rule.ID: RuleStats] = [:]
-        for id in ids {
-            let status = await engine.status(of: id)
-            if status != .ok { newStatuses[id] = status }
-            newStats[id] = (try? await activityStore.stats(ruleID: id)) ?? RuleStats()
+        for rule in rules {
+            let status = await engine.status(of: rule.id)
+            if status != .ok {
+                newStatuses[rule.id] = status
+            } else if let folderStatus = folderStatuses[rule.id] {
+                newStatuses[rule.id] = folderStatus
+            }
+            newStats[rule.id] = (try? await activityStore.stats(ruleID: rule.id)) ?? RuleStats()
         }
         statuses = newStatuses
         stats = newStats
+        folderUsages = usages
         recentActivity = (try? await activityStore.recent(limit: Self.recentActivityLimit)) ?? []
+        activityRevision += 1
     }
 
     // MARK: - Engine events
@@ -260,7 +330,7 @@ final class EngineController {
             applyRequests.append(request)
             onPromptNeeded?()
         case .loopDetected(let alert):
-            notifier.loopDetected(alert)
+            notifier.loopDetected(alert, level: notificationLevel)
         }
         await refresh()
     }
@@ -270,8 +340,13 @@ final class EngineController {
             if let request = summary.pendingApproval {
                 addBulkRequest(request)
             } else {
-                notifier.runFinished(summary)
+                notify(summary)
             }
         }
+    }
+
+    private func notify(_ summary: RunSummary) {
+        let notifyEachRun = rules.first { $0.id == summary.ruleID }?.options.notifyEachRun ?? false
+        notifier.runFinished(summary, level: notificationLevel, notifyEachRun: notifyEachRun)
     }
 }

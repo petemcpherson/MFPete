@@ -10,7 +10,7 @@
 - [x] Phase 3: Triggers, file watching, and engine safety
 - [x] Phase 4: Menu bar and dashboard UI
 - [x] Phase 5: Rule editor, preview, and templates
-- [ ] Phase 6: Activity log, settings, onboarding, and permissions
+- [x] Phase 6: Activity log, settings, onboarding, and permissions
 - [ ] Phase 7: Distribution, updates, and release
 
 ---
@@ -388,53 +388,66 @@ Goal: the When / If / Then editor (D11) with live summary, live match count, pre
 
 ---
 
-## Phase 6: Activity log, settings, onboarding, and permissions
+## Phase 6: Activity log, settings, onboarding, and permissions [COMPLETED]
 
 Goal: complete the remaining v1 surfaces so the app is trustworthy and self-explanatory.
 
 ### 6.1 Activity log window (spec §8.4, D15: keep it simple)
-- [ ] `Window("Activity", id: "activity")` with a `Table`, newest first: Time, Rule, Trigger (File event / Scheduled / Ran late / Manual), Action, File, Result (✓ / ⚠︎ / ✕). Failure/skip message as a second line under the file name.
-- [ ] Filters: Rule popup (All rules / one rule) and an "Errors only" toggle. Opening from a rule's "Show Activity" or from a notification click pre-selects the rule.
-- [ ] Row context menu: Reveal in Finder (if file exists), Copy path.
-- [ ] "Clear log" (confirm). Retention is fixed (30 days / 10,000 entries); pruning runs at launch and daily.
-- [ ] Efficient queries with `FetchDescriptor` limits and sort by timestamp (10,000 rows max).
+- [x] `Window("Activity", id: "activity")` with a `Table`, newest first: Time, Rule, Trigger (File event / Scheduled / Ran late / Manual), Action, File, Result (✓ / ⚠︎ / ✕). Failure/skip message as a second line under the file name.
+- [x] Filters: Rule popup (All rules / one rule) and an "Errors only" toggle. Opening from a rule's "Show Activity" or from a notification click pre-selects the rule.
+- [x] Row context menu: Reveal in Finder (if file exists), Copy path.
+- [x] "Clear log" (confirm). Retention is fixed (30 days / 10,000 entries); pruning runs at launch and daily.
+- [x] Efficient queries with `FetchDescriptor` limits and sort by timestamp (10,000 rows max).
 
 ### 6.2 Notifications (spec §8.8, D15)
-- [ ] `NotificationService` using `UNUserNotificationCenter`. Takes `RunSummary` values from `EngineController`.
-- [ ] One summary per run, never per file ("Clean Downloads: 3 files moved to Trash", "Sort by type: 5 files processed, 1 failed", "…: No matching files" for manual runs).
-- [ ] `NotificationPolicy.shouldNotify(level:, rule:, summary:) -> Bool` as a pure function in `MFPeteCore`, implementing the spec §8.8 table (Off / Errors only / Every run × automatic / manual / error). Automatic runs with 0 files acted on never notify.
-- [ ] Coalescing: merge file-event summaries for the same rule within a 5 s window into one notification (sum the counts). Same for errors.
-- [ ] Per-rule "Notify on each run" forces summaries under "Errors only".
-- [ ] "Show notification" action fires at every level, including Off.
-- [ ] Loop-guard alert, disk-full and missing-destination errors go through the same error path.
-- [ ] Notification click (`UNUserNotificationCenterDelegate`) opens the Activity window filtered to that rule (rule ID in `userInfo`).
-- [ ] App works fully without notification permission.
-- [ ] Unit tests: every row of the policy table, coalescing window, summary text.
+- [x] `NotificationService` using `UNUserNotificationCenter`. Takes `RunSummary` values from `EngineController`.
+- [x] One summary per run, never per file ("Clean Downloads: 3 files moved to Trash", "Sort by type: 5 files processed, 1 failed", "…: No matching files" for manual runs).
+- [x] `NotificationPolicy.shouldNotify(level:, rule:, summary:) -> Bool` as a pure function in `MFPeteCore`, implementing the spec §8.8 table (Off / Errors only / Every run × automatic / manual / error). Automatic runs with 0 files acted on never notify.
+- [x] Coalescing: merge file-event summaries for the same rule within a 5 s window into one notification (sum the counts). Same for errors.
+- [x] Per-rule "Notify on each run" forces summaries under "Errors only".
+- [x] "Show notification" action fires at every level, including Off.
+- [x] Loop-guard alert, disk-full and missing-destination errors go through the same error path.
+- [x] Notification click (`UNUserNotificationCenterDelegate`) opens the Activity window filtered to that rule (rule ID in `userInfo`).
+- [x] App works fully without notification permission.
+- [x] Unit tests: every row of the policy table, coalescing window, summary text.
 
 ### 6.3 Settings scene (spec §8.5)
-- [ ] **General:** Launch at login (`SMAppService.mainApp.register()/unregister()`, reflect real status including "Requires approval"); Show icon in Dock (`NSApp.setActivationPolicy(.regular/.accessory)`, persisted, applied at launch); Notifications level.
-- [ ] **Folders:** list of all scope folders, the rules using each, status (OK / missing / no permission / unavailable), Reveal in Finder, "Open Privacy & Security" button (`x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders`).
-- [ ] **Advanced:** settle delay (1–30 s), bulk guard threshold, Export all rules, Import rules, Reset processed-file history (confirm). No log retention setting in v1 (D15).
-- [ ] **About:** version, MIT license, GitHub link. Sparkle controls come in Phase 7 (leave a placeholder).
+- [x] **General:** Launch at login (`SMAppService.mainApp.register()/unregister()`, reflect real status including "Requires approval"); Show icon in Dock (`NSApp.setActivationPolicy(.regular/.accessory)`, persisted, applied at launch); Notifications level.
+- [x] **Folders:** list of all scope folders, the rules using each, status (OK / missing / no permission / unavailable), Reveal in Finder, "Open Privacy & Security" button (`x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders`).
+- [x] **Advanced:** settle delay (1–30 s), bulk guard threshold, Export all rules, Import rules, Reset processed-file history (confirm). No log retention setting in v1 (D15).
+- [x] **About:** version, MIT license, GitHub link. Sparkle controls come in Phase 7 (leave a placeholder).
 
 ### 6.4 Import / export (spec §9)
-- [ ] Export one rule (dashboard `⋯`) or all rules (Settings) via `NSSavePanel` to `.json` with the `rules.json` schema, paths tilde-abbreviated.
-- [ ] Import via `NSOpenPanel`: migrate older versions, assign new IDs to avoid collisions, append at end of order, import **disabled**. Unknown types → disabled with warning. Missing folders show "Folder missing".
+- [x] Export one rule (dashboard `⋯`) or all rules (Settings) via `NSSavePanel` to `.json` with the `rules.json` schema, paths tilde-abbreviated.
+- [x] Import via `NSOpenPanel`: migrate older versions, assign new IDs to avoid collisions, append at end of order, import **disabled**. Unknown types → disabled with warning. Missing folders show "Folder missing".
 
 ### 6.5 Onboarding (spec §8.7)
-- [ ] First-launch window with three steps: what MFPete does (When/If/Then picture), Launch at login toggle (default on) + notification permission request, "Create your first rule" templates or Skip.
-- [ ] After closing: one-time popover/hint pointing at the menu bar icon (a small borderless panel anchored near the status item is acceptable, since `MenuBarExtra` exposes no anchor).
-- [ ] Store `hasCompletedOnboarding`.
+- [x] First-launch window with three steps: what MFPete does (When/If/Then picture), Launch at login toggle (default on) + notification permission request, "Create your first rule" templates or Skip.
+- [x] After closing: one-time popover/hint pointing at the menu bar icon (a small borderless panel anchored near the status item is acceptable, since `MenuBarExtra` exposes no anchor).
+- [x] Store `hasCompletedOnboarding`.
 
 ### 6.6 Permissions and error states (spec §10, §13)
-- [ ] Central folder-status checker used by engine, dashboard badges, menu bar dot, and Settings › Folders.
-- [ ] Error table from spec §13 fully covered: destination missing, permission denied, vanished file, disk full, unarchive failure, loop detected, corrupt rules file alert.
-- [ ] Corrupt rules file alert on launch (from Phase 1.4 flag).
+- [x] Central folder-status checker used by engine, dashboard badges, menu bar dot, and Settings › Folders.
+- [x] Error table from spec §13 fully covered: destination missing, permission denied, vanished file, disk full, unarchive failure, loop detected, corrupt rules file alert.
+- [x] Corrupt rules file alert on launch (from Phase 1.4 flag).
 
 ### 6.7 Accessibility and polish
-- [ ] VoiceOver labels on all custom controls; full keyboard navigation in editor and dashboard.
-- [ ] Light/dark mode check on every screen.
-- [ ] All strings in the String Catalog.
+- [x] VoiceOver labels on all custom controls; full keyboard navigation in editor and dashboard.
+- [ ] Light/dark mode check on every screen (manual check; views use only semantic colors, not yet checked by hand).
+- [x] All strings in the String Catalog.
+
+**Implementation notes (decisions made in Phase 6):**
+- Activity window (`MFPete/Activity/ActivityWindow.swift`) loads through `ActivityStore.entries(ruleID:errorsOnly:limit:)` (an actor fetch, newest first, max 10,000) instead of `@Query`, and reloads when `EngineController.activityRevision` changes (bumped on every refresh). "Errors only" = failed entries. Double-click reveals the file.
+- `AppState.showActivity(ruleID:)` sets an `ActivityRequest` (new ID each time) and opens the window; the dashboard row menu, toolbar, menu bar ("Show Activity…"), and notification clicks all use it.
+- Notifications: `NotificationPolicy`, `RunNotificationText`, and `NotificationCoalescer` live in `MFPeteCore/Notifications`. `shouldNotify` takes `notifyEachRun: Bool` rather than the rule. "Apply" to existing files counts as a user-started run (like Manual). Only `.fileEvent` summaries are coalesced (5 s, keyed by rule); mixed verbs merge to "processed". Loop alerts post unless the level is Off.
+- `SummaryNotifier` (app) implements `RunNotifier` and posts through a `NotificationPoster` protocol (`UserNotificationPoster` in the app, a recorder in tests). The engine's "Show notification" action now uses `ActionNotificationPoster`. `NotificationClickHandler` is the `UNUserNotificationCenter` delegate.
+- Settings values (`notificationLevel`, `settleDelay`, `bulkThreshold`) live on `EngineController`, persisted in its `UserDefaults` and pushed to the engine live. Bulk threshold range 5–10,000. `showDockIcon` and `hasCompletedOnboarding` live on `AppState`.
+- `FolderStatusChecker` (core) lists every scope folder with health; `EngineController.refresh()` runs it off the main thread and uses it for rules the engine has not flagged, so disabled and imported rules get "Folder missing" / "No permission" badges. A "No permission" badge opens Privacy & Security › Files and Folders.
+- `RuleImporter` (core) migrates, assigns new IDs, appends at the end, imports disabled, and reports unknown rules. Import / Export All are in Settings › Advanced.
+- Onboarding is a `Window` opened at launch when `hasCompletedOnboarding` is false. Closing it at any step counts as done. Template buttons open the Rules window with the editor pre-filled (`AppState.pendingTemplate`). `MenuBarHint` finds the `NSStatusBarWindow` and shows a borderless panel under it for 8 s. UI tests skip onboarding unless `--ui-testing-onboarding` is passed.
+- `LaunchAlerts` shows the corrupt-rules-file alert (with "Show File") and a notice for rules turned off because of unknown parts.
+- About tab uses a placeholder GitHub URL (`AppInfo.repositoryURL`); update it when the repo is public (Phase 7).
+- UI tests for Activity and onboarding are written (`ActivityAndOnboardingUITests.swift`) but could not run in this environment ("Timed out while enabling automation mode").
 
 **Done when:** every v1 bullet in spec §16 except distribution works end to end.
 

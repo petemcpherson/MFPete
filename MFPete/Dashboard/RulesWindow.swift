@@ -52,6 +52,8 @@ struct RulesWindow: View {
         .toolbar { toolbar }
         .navigationTitle("Rules")
         .task { await controller.refresh() }
+        .onAppear { openPendingTemplate() }
+        .onChange(of: appState.pendingTemplate) { _, _ in openPendingTemplate() }
         .frame(minWidth: 580, minHeight: 380)
     }
 
@@ -120,6 +122,8 @@ struct RulesWindow: View {
             }
         case .export:
             RuleExporter.export([rule], suggestedName: rule.name)
+        case .showActivity:
+            appState.showActivity(ruleID: rule.id)
         case .runAgainOnAllFiles:
             controller.runAgainOnAllFiles(rule.id)
         case .delete:
@@ -130,6 +134,13 @@ struct RulesWindow: View {
     private func openEditor(_ rule: Rule) {
         controller.clearError(rule.id)
         editing = EditorTarget(rule: rule, isNew: false)
+    }
+
+    /// Onboarding asked for a template: open it in the editor.
+    private func openPendingTemplate() {
+        guard let template = appState.pendingTemplate else { return }
+        appState.pendingTemplate = nil
+        newRule(from: template)
     }
 
     private func newRule(from template: RuleTemplate? = nil) {
@@ -218,12 +229,13 @@ struct RulesWindow: View {
             }
             .help("Sort rules")
 
-            // The Activity window arrives with the activity log (Phase 6).
-            Button {} label: {
+            Button {
+                appState.showActivity()
+            } label: {
                 Label("Activity", systemImage: "list.bullet.rectangle")
             }
-            .disabled(true)
             .help("Activity log")
+            .accessibilityIdentifier("showActivity")
 
             Menu {
                 Button("New Rule") { newRule() }

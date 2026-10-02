@@ -1,6 +1,6 @@
 # MFPete: Product & Technical Spec
 
-> Status: Final v1.0 (2026-10-01)
+> Status: Final v1.1 (2026-10-01). v1.1 adds D14 (manual Run Now) and D15 (notifications and simple activity log).
 > Source: `context/notes.md`
 > Scope: what the app is and how it should behave. No implementation plan yet.
 
@@ -25,6 +25,8 @@ These decisions are settled. The rest of the spec reflects them.
 | D11 | Rule editor | **Form cards (When / If / Then)** with popup menus, plus a **live sentence summary** at the top of the editor and in each dashboard row. | Cards scale to many conditions and are standard SwiftUI controls. The sentence gives the IFTTT feel. |
 | D12 | Condition nesting | **Top-level All/Any group plus one level of sub-groups** in the UI. Data model allows any depth. | Covers real use. Deeper nesting is rare and costly in UI. |
 | D13 | Swift language mode | **Swift 5 language mode** (template default) with Swift 6 compiler. Engine isolated in an `actor`; UI on `@MainActor`. | FSEvents and other C callback APIs fight Swift 6 strict concurrency. The actor design still gives safe concurrency. Migrate to Swift 6 mode later. |
+| D14 | Manual run | **Run Now button on every dashboard row**, plus the row menu, the menu bar "Run rule ▸" submenu, and "Save & Run" in the editor. Works for any trigger type, on disabled rules, and while all rules are paused. Same scan as a scheduled run (§3.3). | One-off runs at the click of a button. An explicit user action should always work. |
+| D15 | Notifications and log | **One summary notification per run, never per file.** Default level "Errors only". Activity log stays a single simple table with fixed retention (30 days / 10,000 entries). | Gives feedback when a rule runs without notification spam or a log UI to maintain. |
 
 ---
 
@@ -106,8 +108,27 @@ A scheduled run scans all items in the scope folders and applies conditions. Typ
 
 **Missed schedules:** If the Mac was asleep or the app was not running at the scheduled time, the engine runs the rule **once** on next wake/launch (no backlog of multiple runs). Logged as "Ran late (missed 09:00)".
 
-### 3.3 Manual run
-Every rule, regardless of trigger, has a **Run Now** command (dashboard row menu and editor). Run Now scans all items in scope, same as a scheduled run.
+### 3.3 Manual run (Run Now, D14)
+Every rule has a **Run Now** command for one-off runs, whatever its trigger.
+
+Where:
+- A visible **Run Now button** (`play.fill` icon) on each dashboard row (§8.2). Always shown, not only on hover.
+- Dashboard row `⋯` menu, and menu bar **Run rule ▸** submenu (§8.1).
+- Editor footer: **Save & Run** (saves the rule, closes the editor, then runs it).
+
+Behavior:
+- Scans all items in the scope folders and tests conditions, same as a scheduled run.
+- Respects the processed-file record (D6). Files this rule already processed and that have not changed are skipped. The result says so ("2 files skipped: already processed") and points to **Run Again on All Files** for a full rerun.
+- Bulk guard (§5.6) applies.
+- Works on disabled rules and while all rules are paused. A click is an explicit request.
+- Does not change the rule's schedule. The next scheduled run still happens at its normal time.
+- If the rule is already running, the button shows a spinner and is disabled. No queue.
+- Not available for "File removed" rules (no files to scan). The button is disabled with a tooltip.
+
+Feedback:
+- The dashboard row shows a spinner during the run, then updates "Last run".
+- A manual run always posts a summary notification, unless notifications are Off (§8.5). A run that matched no files says "No matching files".
+- The activity log records the run with trigger "Manual" (§8.4).
 
 ### 3.4 Apply to existing files on enable
 When the user creates or enables a file-event rule, the app asks once: "Apply this rule to the N files already in Downloads that match?" with **Preview**, **Apply**, **Only new files**. Default selection: **Only new files** (safe).
@@ -252,7 +273,7 @@ Run Shortcut and Run shell script (v2, D9), Import to Photos (PhotoKit), Mount D
 | Include subfolders | off | §5.2 |
 | Include hidden files | off | §5.4 |
 | Stop processing other rules for matched files | off | See D5. |
-| Notify on each run | off | Summary notification "Clean Downloads: 3 files moved to Trash". |
+| Notify on each run | off | Summary notification after every run of this rule, even when the global level is "Errors only" (§8.5, §8.8). |
 | Notes | empty | Free text, for the user. |
 
 ---
@@ -273,7 +294,7 @@ Recent activity
   Unarchived assets.zip                    1h ago
 ──────────────
 Pause all rules            ⌘P
-Run rule ▸                 (submenu of rules)
+Run rule ▸                 (submenu of rules, D14)
 ──────────────
 Open Rules…                ⌘R
 Settings…                  ⌘,
@@ -293,21 +314,22 @@ Layout: a single list, not a split view.
 ┌───────────────────────────────────────────────────────────────┐
 │  Rules                           [Search……]  [Filter ▾]  [ + ] │
 ├───────────────────────────────────────────────────────────────┤
-│ [●] Clean Downloads                                     [ ⋯ ] │
+│ [●] Clean Downloads                                [▶]  [ ⋯ ] │
 │     When file added to Downloads · if extension is dmg, zip   │
 │     → Move to Trash            Last run 2m ago · 128 files    │
 ├───────────────────────────────────────────────────────────────┤
-│ [●] Archive old screenshots                             [ ⋯ ] │
+│ [●] Archive old screenshots                        [▶]  [ ⋯ ] │
 │     Daily at 09:00 in Screenshots · if date added > 3 days    │
 │     → Move to Archive          Last run today 09:00 · 12 files│
 ├───────────────────────────────────────────────────────────────┤
-│ [○] Sort Documents (disabled)                           [ ⋯ ] │
+│ [○] Sort Documents (disabled)                      [▶]  [ ⋯ ] │
 │     ...                                                        │
 └───────────────────────────────────────────────────────────────┘
 ```
 
 Row contents:
 - Enable/disable toggle (switch).
+- **Run Now button** (`play.fill`, D14). Spinner while the rule runs.
 - Rule name.
 - One-line sentence summary generated from the rule (D11).
 - Last run time, files processed count (lifetime), error badge if last run failed.
@@ -342,7 +364,7 @@ Opens as a sheet over the dashboard. Three stacked cards plus a summary header.
 │ 1. [Move to Trash ▾]                              [–] [≡] │
 │ [+ Add action]                                             │
 ├───────────────────────────────────────────────────────────┤
-│ ▸ More options                      [Cancel] [Save Rule]  │
+│ ▸ More options          [Cancel] [Save & Run] [Save Rule] │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -352,9 +374,18 @@ Opens as a sheet over the dashboard. Three stacked cards plus a summary header.
 - Validation before save: at least one folder, at least one action, all required parameters set, trigger/action compatibility (§3.1 removed-file limits), destination not equal to source for Move (warning, not error, if a Rename comes first).
 - Destructive action hint: if actions include Move to Trash or Replace conflict policy and conditions are empty, show a warning banner: "This rule will trash every file added to Downloads."
 - Cmd-S saves, Esc cancels (confirm if dirty).
+- **Save & Run** validates, saves, closes the editor, then starts a manual run (§3.3). Disabled for "File removed" rules.
 
-### 8.4 Activity log
-Separate window, opened from the dashboard toolbar or menu bar. Table columns: Time, Rule, Action, File, Result (✓ / ⚠︎ / ✕), Details. Filter by rule and result. Row actions: Reveal in Finder (if file still exists), Copy path, Open rule. Retention: last 30 days or 10,000 entries (configurable). "Clear log" button.
+### 8.4 Activity log (D15)
+Kept deliberately simple: one window, one table, newest first.
+
+- Opened from the dashboard toolbar, the menu bar, a rule's "Show Activity", or by clicking a notification.
+- Table columns: Time, Rule, Trigger (File event / Scheduled / Ran late / Manual), Action, File, Result (✓ / ⚠︎ / ✕). Failure or skip reason shows as a second line under the file name.
+- Filters: a Rule popup (All rules or one rule) and an "Errors only" toggle. Nothing else.
+- Row actions (context menu): Reveal in Finder (if the file still exists), Copy path.
+- Entries: one per action per file, plus rule-level errors. A manual run that matched no files writes one "No matching files" entry so the user sees it ran. Other runs with no matches write nothing.
+- Retention: fixed at last 30 days or 10,000 entries, whichever is smaller. Not configurable in v1.
+- "Clear log" button (confirm).
 
 ### 8.5 Settings
 Standard `Settings` scene, tabs:
@@ -362,12 +393,11 @@ Standard `Settings` scene, tabs:
 - **General**
   - Launch at login (`SMAppService.mainApp`), default on after onboarding asks.
   - Show icon in Dock (off default; switches `NSApp.setActivationPolicy(.regular/.accessory)`).
-  - Notifications: Off / Errors only (default) / Every run.
+  - Notifications: Off / Errors only (default) / Every run (§8.8).
 - **Folders:** read-only list of all folders used by rules, which rules use each, and status (OK / missing / no permission). "Reveal in Finder" per folder. "Open Privacy & Security" button if any folder shows "no permission".
 - **Advanced**
   - File settle delay (2s).
   - Bulk guard threshold (50).
-  - Activity log retention.
   - Export all rules / Import rules (JSON).
   - Reset processed-file history (makes all rules re-evaluate existing files on next run; confirm).
 - **About**: version, MIT license, GitHub link, "Check for Updates…" (Sparkle) and "Automatically check for updates" toggle (on by default).
@@ -389,6 +419,30 @@ Three short steps in one window:
 3. "Create your first rule" with template buttons, or "Skip".
 
 After onboarding the window closes and the app lives in the menu bar. A one-time popover points at the menu bar icon.
+
+### 8.8 Notifications (D15)
+Local notifications through `UNUserNotificationCenter`. No sounds by default.
+
+**One summary per run, never one per file.** Examples:
+- "Clean Downloads: 3 files moved to Trash"
+- "Sort by type: 5 files processed, 1 failed"
+- "Archive old screenshots: No matching files" (manual runs only)
+
+When a summary is posted:
+
+| Level (Settings › General) | Automatic runs | Manual runs (D14) | Errors | "Show notification" action |
+|---|---|---|---|---|
+| Off | never | never | never | yes |
+| Errors only (default) | only if the rule has "Notify on each run" | yes | yes | yes |
+| Every run | yes, if the run acted on at least 1 file | yes | yes | yes |
+
+Rules:
+- Automatic runs that act on 0 files never notify.
+- **Coalescing:** file-event runs of the same rule within 5 seconds merge into one summary. Dropping 20 files into Downloads gives one notification, not 20.
+- Errors (failed actions, loop guard, missing folder, disk full) post one notification per rule per run, merged the same way.
+- The "Show notification" action (§6.1) is an explicit user choice, so it fires at every level, including Off.
+- Clicking a notification opens the Activity log filtered to that rule.
+- If the user denied notification permission, everything still works. The activity log is the record.
 
 ---
 
@@ -469,6 +523,7 @@ struct ActivityEntry {
     var sourcePath: String
     var destinationPath: String?     // enables future undo (D7)
     var result: Result               // success | skipped | failed(message)
+    var runTrigger: RunTrigger       // fileEvent | scheduled | scheduledLate | manual | applyExisting (D14, D15)
 }
 
 struct ProcessedRecord {
@@ -553,7 +608,8 @@ Error badge clears on the next successful run or when the user opens the rule.
 
 - **Unit tests:** condition evaluation (every attribute/operator), name pattern rendering, conflict naming, schedule next-fire calculation (DST changes, missed schedules), rules JSON encode/decode + migration.
 - **Engine integration tests:** run against temp directories: add/modify/remove files, verify settling, chaining, loop guard, once-per-file record, bulk guard.
-- **UI tests:** create rule from template, toggle enable, edit/save, preview shows expected files.
+- **UI tests:** create rule from template, toggle enable, edit/save, preview shows expected files, Run Now button runs a rule.
+- **Notification policy tests:** level × trigger × result table (§8.8) as a pure function, plus coalescing window.
 - Engine logic lives in a module with no SwiftUI/AppKit dependency so it is testable headless.
 
 ---
@@ -562,12 +618,13 @@ Error badge clears on the next successful run or when the user opens the rule.
 
 ### v1 (MVP)
 - Menu bar app, no dock icon, launch at login, onboarding.
-- Dashboard: list, toggle, search, filter, sort, reorder, run now, duplicate, delete.
+- Dashboard: list, toggle, Run Now button, search, filter, sort, reorder, duplicate, delete.
 - Editor: When / If / Then cards, sentence summary, live match count, preview.
 - Triggers: file added, file modified, file removed, interval, daily, weekly, manual.
 - Conditions: §4.2 set, All/Any + one nesting level.
 - Actions: §6.1 set.
-- Activity log, notifications, global pause, bulk guard, loop guard.
+- Run Now button for one-off manual runs (D14).
+- Simple activity log and per-run summary notifications (D15), global pause, bulk guard, loop guard.
 - Templates (§8.6), rule export/import.
 - Signed, notarized, Homebrew cask, Sparkle updates.
 

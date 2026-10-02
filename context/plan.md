@@ -1,0 +1,424 @@
+# MFPete: Implementation Plan
+
+> Source: `context/spec.md` (Final v1.0, 2026-10-01)
+> Scope: v1 (MVP) as defined in spec §16. v1.x and v2 items are out of scope.
+
+## Progress
+
+- [x] Phase 1: Project foundation and data layer
+- [ ] Phase 2: Rule engine core (conditions, actions, run pipeline)
+- [ ] Phase 3: Triggers, file watching, and engine safety
+- [ ] Phase 4: Menu bar and dashboard UI
+- [ ] Phase 5: Rule editor, preview, and templates
+- [ ] Phase 6: Activity log, settings, onboarding, and permissions
+- [ ] Phase 7: Distribution, updates, and release
+
+---
+
+## Architecture Overview
+
+```
+MFPete.xcodeproj
+├── MFPete (app target)            SwiftUI + AppKit. @MainActor UI, app lifecycle, windows.
+│   ├── App/                        MFPeteApp, AppDelegate, AppState, activation policy
+│   ├── MenuBar/                    MenuBarExtra content
+│   ├── Dashboard/                  Rules list window
+│   ├── Editor/                     Rule editor sheet, condition/action rows, preview
+│   ├── Activity/                   Activity log window
+│   ├── Settings/                   Settings scene tabs
+│   ├── Onboarding/                 First-launch window
+│   └── Services/                   Notifications, login item, Sparkle, permissions UI glue
+├── Packages/MFPeteCore (local SPM)  No SwiftUI/AppKit imports. Headless-testable (spec §15).
+│   ├── Model/                      Rule, Trigger, ConditionGroup, Action, RuleOptions, FolderRef
+│   ├── Storage/                    RulesStore (JSON), ActivityStore + ProcessedStore (SwiftData)
+│   ├── Evaluation/                 FileSnapshot, ConditionEvaluator, KindClassifier
+│   ├── Actions/                    ActionExecutor, ConflictResolver, PatternRenderer, Unarchiver
+│   ├── Engine/                     RuleEngine actor, RunPlanner, LoopGuard, BulkGuard
+│   ├── Watching/                   FSEventsWatcher, Settler, IgnoreFilter
+│   ├── Scheduling/                 Scheduler, next-fire calculation
+│   └── Summary/                    RuleSummarizer (sentence text, used by UI)
+├── MFPeteTests                     App-level tests
+└── MFPeteUITests                   UI tests (spec §15)
+```
+
+Key principles:
+- The engine lives in a local Swift package (`MFPeteCore`) so it has no SwiftUI/AppKit dependency and tests run headless. Exception: `NSWorkspace` calls (Open, Reveal, wake/mount notifications) go behind a protocol the app target implements.
+- The app target uses `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (template default). The package does **not** set default MainActor isolation; the engine is an `actor` (D13).
+- Swift 5 language mode in both targets (D13).
+- All user-facing strings use `String(localized:)` and a String Catalog from day one (spec §14).
+
+---
+
+## Phase 1: Project foundation and data layer [COMPLETED]
+
+Goal: a menu bar app shell that launches with no dock icon, loads and saves rules from JSON, and has the SwiftData store ready. No engine yet.
+
+### 1.1 Project settings
+- [x] Set `ENABLE_APP_SANDBOX = NO` and remove the App Sandbox capability / entitlements entry (D2). Keep Hardened Runtime on.
+- [x] Set `MACOSX_DEPLOYMENT_TARGET = 14.0` for all targets (D3). Currently 26.2.
+- [x] Confirm `SWIFT_VERSION = 5.0` (D13) and Swift 6 toolchain.
+- [x] Add `LSUIElement = YES` to Info.plist (spec §11).
+- [x] Confirm bundle ID `com.mftpete.MFPete` (D1).
+- [x] Add `LICENSE` (MIT) at repo root and a stub `README.md`.
+- [x] Add a String Catalog (`Localizable.xcstrings`) to the app target.
+- [x] Delete template files `Item.swift` and the template `ContentView.swift` content.
+
+### 1.2 Create `MFPeteCore` local package
+- [x] Create `Packages/MFPeteCore` with a library target and a test target. Platform `.macOS(.v14)`, Swift 5 language mode.
+- [x] Add the package to the Xcode project and link it to the app target.
+- [x] Verify `swift test` runs from the package folder with no app dependency.
+
+### 1.3 Data model (spec §9)
+- [x] `Rule`, `FolderRef`, `Trigger`, `ConditionGroup`, `ConditionItem`, `Condition`, `Action`, `RuleOptions` as `Codable`, `Hashable`, `Sendable`.
+- [x] `Attribute`, `Operator`, `ConditionValue` (text, number+unit, relative duration, absolute date, kind enum, tag list), `Match` (`.all`/`.any`), `ConflictPolicy` (`.keepBoth`/`.replace`/`.skip`), `SizeUnit`, `DurationUnit`, `FileKind`.
+- [x] Stable, explicit JSON coding for enums with associated values (a `"type"` discriminator plus fields). Do not rely on Swift's synthesized enum coding: the format must stay stable for export/import.
+- [x] Unknown-case decoding: decode unknown action/attribute types into an `.unknown(rawJSON)` placeholder so the rule can import as disabled with a warning (spec §9).
+- [x] Operator validity table: which operators each attribute allows (spec §4.2). Used by evaluator, editor, and validation.
+- [x] `FolderRef` helpers: tilde-abbreviation for display and export, expansion on import.
+- [x] Auto-generated rule name ("Downloads: Move to Trash") per spec §7.
+
+### 1.4 Rules storage (D4)
+- [x] `RulesFile { version: Int; rules: [Rule] }` with `"version": 1`.
+- [x] `RulesStore`: loads/saves `~/Library/Application Support/MFPete/rules.json`. Creates folder on first run.
+- [x] Atomic save: write `rules.json.bak` copy of the current file, then write new file atomically (spec §13).
+- [x] Corrupt-file recovery: try `rules.json`, then `.bak`; if both fail, rename corrupt file to `rules.corrupt-<timestamp>.json`, start empty, and surface an alert flag to the UI.
+- [x] Migration hook: `migrate(from version:)` pipeline (empty for v1, but tested).
+
+### 1.5 SwiftData store (D4)
+- [x] `@Model ActivityEntry` (spec §9 fields, plus `resultKind` enum raw value and `message` for failures, and `detail` string).
+- [x] `@Model ProcessedRecord` with a unique compound key (`ruleID` + `fileKey`) and `modifiedAt`.
+- [x] `ModelContainer` at `~/Library/Application Support/MFPete/MFPete.store`.
+- [x] `ActivityStore` and `ProcessedStore` as `@ModelActor` types so the engine actor can write off the main thread. UI reads through a main-context `@Query`.
+- [x] Retention pruning: delete entries older than 30 days or beyond 10,000 (configurable later in Phase 6).
+
+### 1.6 App shell
+- [x] `MFPeteApp` with `MenuBarExtra(.menu)` showing placeholder items and Quit.
+- [x] `Window("Rules", id: "rules")` scene and `Settings` scene (empty tabs for now).
+- [x] `AppState` (`@Observable`, `@MainActor`) owning the loaded rules array and exposing add/update/delete/reorder that persist through `RulesStore`.
+- [x] `AppDelegate` via `@NSApplicationDelegateAdaptor`: closing the last window does not quit (`applicationShouldTerminateAfterLastWindowClosed` → `false`).
+- [x] Single instance: on second launch, activate the running instance and open the Rules window (check `NSRunningApplication` with the same bundle ID, send a distributed notification, then terminate).
+- [x] Activation helper: when opening a window in accessory mode, call `NSApp.activate()` so the window comes to front.
+
+### 1.7 Tests
+- [x] JSON round-trip for every `Trigger`, `Action`, `ConditionValue` case.
+- [x] Decoding a fixture `rules.json` (checked into the test bundle) to lock the format.
+- [x] Unknown action type imports as `.unknown` and marks the rule disabled.
+- [x] Corrupt file → backup load → empty-start path.
+
+**Done when:** app launches into the menu bar with no dock icon, rules persist across relaunch, `swift test` passes in `MFPeteCore`.
+
+---
+
+## Phase 2: Rule engine core (conditions, actions, run pipeline)
+
+Goal: given a rule and a list of candidate files, the engine evaluates conditions and performs actions correctly, logging results. Triggered only by "Run Now" in this phase.
+
+### 2.1 File snapshot
+- [ ] `FileSnapshot` struct built from `URL.resourceValues(forKeys:)`: name, extension, full name, isDirectory, isPackage, isSymlink/alias, `contentType` (UTType), `fileSize`, `totalFileAllocatedSize`, `addedToDirectoryDate`, `creationDate`, `contentModificationDate`, `tagNames`, `fileIdentifier` / volume UUID, ubiquitous/dataless status.
+- [ ] `Downloaded from`: read `com.apple.metadata:kMDItemWhereFroms` xattr with `getxattr`, decode binary plist into `[String]`.
+- [ ] `FileKey` builder: volume UUID + `fileIdentifierKey` (inode), path as fallback (spec §5.5).
+
+### 2.2 Kind classification
+- [ ] `KindClassifier` maps `UTType` conformance to `FileKind`: Folder, Image, Movie, Audio, PDF, Text, Document, Archive, Disk Image, Application, Alias/Symlink, Other (spec §4.2).
+- [ ] Order matters (PDF before Document, Application before Folder for `.app` bundles). Document and test the precedence.
+
+### 2.3 Condition evaluation (spec §4)
+- [ ] `ConditionEvaluator.matches(_ group: ConditionGroup, snapshot:, now:) -> Bool`, recursive for any depth (D12: data model allows any depth).
+- [ ] Empty group = match all. `.all` = AND, `.any` = OR.
+- [ ] Text ops: is, is not, contains, does not contain, starts with, ends with, matches pattern (`*`, `?` wildcard via `fnmatch` or a small hand-written matcher). Case-insensitive by default.
+- [ ] Extension ops: is, is not, is any of (comma list, trimmed, dot stripped, lowercased).
+- [ ] Kind ops: is, is not.
+- [ ] Size ops: greater than / less than with KB/MB/GB (decide 1000 vs 1024: use 1000 to match Finder, document it).
+- [ ] Date ops: in the last N (min/hours/days/weeks/months), not in the last N, before date, after date. Use `Calendar` for months/weeks.
+- [ ] Tag ops: contains tag, does not contain tag, has no tags.
+- [ ] Downloaded from ops: contains, does not contain, is.
+- [ ] Any file: always true.
+
+### 2.4 Name patterns (spec §6.2)
+- [ ] `PatternRenderer.render(_ pattern: String, snapshot:, now:, counter:) -> String`.
+- [ ] Tokens: `{name}`, `{extension}`, `{fullname}`, `{date-added}`, `{date-created}`, `{date-modified}`, `{year}`, `{month}`, `{day}`, `{today}`, `{time}`, `{counter}`, `{folder}`, `{kind}`.
+- [ ] Replace `:` and `/` with `-` in rendered file names. For Sort into subfolder, split the pattern on `/` first so `{year}/{month}` creates nested folders, then sanitize each segment.
+- [ ] Unknown tokens render literally (and the editor flags them in Phase 5).
+
+### 2.5 Conflict resolution (spec §6.3)
+- [ ] `ConflictResolver.resolve(destination:, policy:) -> Resolution` (`.proceed(URL)`, `.replaceAfterTrashing(URL)`, `.skip`).
+- [ ] Keep both: Finder-style ` 2`, ` 3` before the extension. Handle names with no extension and multi-dot names (`archive.tar.gz` → treat last extension only, matching Finder).
+- [ ] Replace: trash the existing item first, never overwrite.
+- [ ] `{counter}` in a rename pattern takes priority over Keep both suffixing.
+
+### 2.6 Action execution (spec §6.1)
+- [ ] `ActionExecutor` protocol-based, one handler per action. Each returns `ActionOutcome { newURL?, destinationPath?, result }`.
+- [ ] Move to folder, Copy to folder (later actions keep the original), Rename, Change extension, Move to Trash (`FileManager.trashItem`), Sort into subfolder (create missing subfolders), Add tags / Remove tags (`URLResourceValues.tagNames`).
+- [ ] Unarchive (`.zip` only): run `/usr/bin/ditto -x -k <zip> <tempDir>` via `Process`, then move results into destination with conflict handling (Keep both). Optional trash of archive. Report extracted paths so Phase 3 can treat them as "added" files.
+- [ ] Open, Reveal in Finder, Show notification: go through a `WorkspaceService` / `NotificationService` protocol injected by the app target (keeps the package AppKit-free).
+- [ ] Wrap writes in `NSFileCoordinator` where another app might be writing (spec §5.7).
+- [ ] Missing destination folder → fail with clear message (auto-create is v1.x, spec §13). Exception: Sort into subfolder creates subfolders under an existing base.
+- [ ] Map errors: file vanished → `skipped`; permission denied → `failed` + rule marked "No permission"; disk full → `failed`.
+
+### 2.7 Run pipeline (spec §2.1)
+- [ ] `RuleEngine` actor with `run(rule:, candidates:, reason:)`.
+- [ ] Candidate listing for full scans: direct children by default, recursive with "Include subfolders" (do not descend into packages; spec §5.2). Use `FileManager.enumerator` with `.skipsPackageDescendants` and prefetching resource keys.
+- [ ] `IgnoreFilter`: hidden files, `.DS_Store`, `Icon\r`, `.localized`, in-progress download patterns (spec §5.3, §5.4). Respect "Include hidden files".
+- [ ] Processed-record check (D6): skip a file if a record exists with `modifiedAt >= current contentModificationDate`. Write the record after the actions finish.
+- [ ] Multi-rule ordering (D5): when several rules share a candidate, run them in dashboard order. If a rule moved or trashed the file, later rules for that folder skip it. Honor "Stop processing other rules for matched files".
+- [ ] Per-file action chain: serial. If an action fails, stop remaining actions for that file and log.
+- [ ] Parallelism across files: `TaskGroup` with max 4 concurrent files (spec §5.7).
+- [ ] Self-change tracking: record paths the engine just created/modified with a short TTL so Phase 3 can suppress events for the producing rule (spec §5.4, §5.5).
+- [ ] Write one `ActivityEntry` per action, plus rule-level error entries.
+- [ ] Rule stats (last run, lifetime file count, last error) computed from activity log queries, not stored in JSON (spec §9).
+- [ ] Folder health check before each run: exists and readable, else mark rule "Folder missing" / "No permission" (spec §10).
+
+### 2.8 Dry run (for Preview)
+- [ ] `RuleEngine.plan(rule:)` returns `[PlannedFileResult { file, steps: [PlannedStep] }]` with predicted destination paths. No file system changes. Reuses evaluator, pattern renderer, and conflict resolver in simulation mode.
+
+### 2.9 Rule summary sentence (D11)
+- [ ] `RuleSummarizer.sentence(for: rule)` → "When a file is added to Downloads, if its extension is dmg or zip, then move it to the Trash."
+- [ ] Short form for dashboard rows (two lines: trigger + conditions, actions).
+- [ ] Put this in `MFPeteCore` so it is unit tested; use `String(localized:)` for fragments.
+
+### 2.10 Tests (spec §15)
+- [ ] Every attribute × operator combination, using temp files with set dates/tags/xattrs.
+- [ ] Nested groups (All containing Any).
+- [ ] Pattern rendering for every token and sanitization.
+- [ ] Conflict naming: Keep both, Replace (goes to Trash), Skip; names without extension.
+- [ ] Each action against a temp directory, including Unarchive of a Finder-style zip and a corrupt zip.
+- [ ] Once-per-file record: second run does nothing; modifying the file makes it eligible again.
+- [ ] D5 ordering and "stop other rules".
+- [ ] Summary sentence snapshots for each template rule.
+
+**Done when:** a headless test can build a rule, point it at a temp folder, call Run Now, and verify the files moved/renamed/tagged and the activity entries written.
+
+---
+
+## Phase 3: Triggers, file watching, and engine safety
+
+Goal: rules fire automatically from file events and schedules, safely, with loop and bulk protection.
+
+### 3.1 FSEvents watcher (spec §5.1)
+- [ ] `FSEventsWatcher` wrapping `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagNoDefer`, dispatch queue delivery (`FSEventStreamSetDispatchQueue`).
+- [ ] One stream for the union of enabled rules' scope folders. Rebuild when the set changes (rule add/edit/enable/disable/delete).
+- [ ] C callback bridges into an `AsyncStream<[FileEvent]>` consumed by the engine actor (D13: keep the C boundary small, mark it `@unchecked Sendable` where needed).
+- [ ] Map flags to added / modified / removed. Treat rename pairs: item renamed into a scope folder = added, renamed out = removed.
+- [ ] Persist the last event ID (`UserDefaults`) on a throttle (for example every 5 s and on quit).
+- [ ] Launch: start from the stored event ID so missed events replay. On `kFSEventStreamEventFlagMustScanSubDirs`, `UserDropped`/`KernelDropped`, or event ID wrap, fall back to a full scan of affected folders compared against the processed-file record.
+- [ ] Filter events to direct children unless "Include subfolders" is on.
+
+### 3.2 Settling (spec §5.3)
+- [ ] `Settler` actor: per-path timer. A file becomes ready when size and modification date are unchanged for the settle delay (default 2 s, range 1–30 s).
+- [ ] Skip known in-progress names (`*.crdownload`, `*.download`, `*.part`, `*.partial`, `*.tmp`, `*.opdownload`, `.com.google.Chrome.*`). When the final name appears, it arrives as a new event.
+- [ ] Dataless cloud placeholders: if the action set needs file contents (Copy, Unarchive), wait until the file is downloaded; never trigger a download during scheduled scans unless an action needs contents (spec §12).
+- [ ] If the file disappears before settling, drop it silently.
+
+### 3.3 Trigger routing
+- [ ] File added → candidates from added events after settling.
+- [ ] File modified → debounced (reuse settle delay). Ignore modifications the engine itself made (self-change tracking from Phase 2.7).
+- [ ] File removed → no settle, no snapshot from disk. Evaluate name/extension/path conditions only; allow only Notify-style actions (editor enforces in Phase 5; engine also guards).
+- [ ] Chaining: items the engine creates/moves into a watched folder are suppressed for the producing rule only. Other rules see them as added (spec §5.4). Unarchive outputs count as added.
+
+### 3.4 Scheduler (spec §3.2)
+- [ ] `Scheduler` computes `nextFireDate(after:)` for interval (min 5 min), daily, and weekly triggers using `Calendar.current` (handles DST).
+- [ ] Single timer for the soonest next fire; recompute after each fire and on rule change.
+- [ ] Persist `lastScheduledRun` per rule (small JSON or `UserDefaults` keyed by rule ID).
+- [ ] Missed schedules: on launch and on wake, if a scheduled time passed while asleep/closed, run once and log "Ran late (missed 09:00)". No backlog.
+- [ ] Scheduled run = full scan of scope folders (same as Run Now).
+
+### 3.5 Lifecycle hooks (spec §11)
+- [ ] App target forwards `NSWorkspace.didWakeNotification` → engine: run missed schedules, restart stream if needed.
+- [ ] `didMountNotification` / `didUnmountNotification` → rules on that volume go "Folder unavailable" without error spam, resume on mount, rebuild stream.
+- [ ] Clean shutdown: flush event ID, stop stream.
+
+### 3.6 Safety
+- [ ] Loop guard (spec §5.6): track runs per file key over 60 s. Over 10 runs → stop the chain, log "Possible rule loop between Rule A and Rule B", send notification. Disable nothing.
+- [ ] Bulk guard: if one run would act on more than the threshold (default 50), pause and emit a `BulkApprovalRequest` to the UI (Preview / Run / Cancel). Not applied to the first-enable prompt.
+- [ ] Global pause: engine flag. Events received while paused are discarded. On resume, UI offers "Scan now" for file-event rules.
+- [ ] Apply-to-existing on enable (spec §3.4): when a file-event rule is created or enabled, engine counts current matches and emits a request to the UI (Preview / Apply / Only new files, default Only new files). "Only new files" writes processed records for current files so they are skipped.
+- [ ] "Run Again on All Files" per rule: delete that rule's processed records (D6).
+
+### 3.7 Tests (spec §15)
+- [ ] Integration tests with temp directories and a real FSEvents stream: add/modify/remove, settling (write a file in chunks), chaining across two rules, loop guard trips, bulk guard trips, pause discards.
+- [ ] Event ID replay: stop watcher, add files, restart from stored ID, verify catch-up.
+- [ ] Scheduler next-fire tests across DST transitions and weekday sets; missed-schedule logic with an injected clock.
+
+**Done when:** dropping a `.zip` into a watched folder with an Unarchive rule extracts it within ~3 seconds, and a daily rule runs once after wake if missed.
+
+---
+
+## Phase 4: Menu bar and dashboard UI
+
+Goal: the user can see, toggle, reorder, search, run, duplicate, and delete rules, and the menu bar reflects live state.
+
+### 4.1 App ↔ engine bridge
+- [ ] `EngineController` (`@MainActor @Observable`) owns the `RuleEngine` actor, pushes rule changes to it, and exposes UI state: paused, per-rule status (OK / error / folder missing / no permission), pending bulk/apply requests, recent activity.
+- [ ] Error badge clears on the next successful run or when the user opens the rule (spec §13).
+
+### 4.2 Menu bar extra (spec §8.1)
+- [ ] Header: "MFPete — N rules active" (disabled item).
+- [ ] Recent activity: last 3–5 entries with relative time; click reveals in Finder.
+- [ ] Pause all rules (⌘P), Run rule ▸ submenu, Open Rules… (⌘R), Settings… (⌘,), Quit (⌘Q).
+- [ ] Icon: template SF Symbol `tray.and.arrow.down`; paused variant; badge dot when any rule has an unresolved error.
+- [ ] Opening a window from the menu activates the app (accessory mode).
+
+### 4.3 Dashboard window (spec §8.2)
+- [ ] Single `List` with custom rows: toggle, name, summary (2 lines from `RuleSummarizer`), last run, lifetime file count, error badge.
+- [ ] Row `⋯` menu: Edit, Run Now, Preview Matches, Duplicate, Export…, Show Activity, Run Again on All Files, Delete (confirm).
+- [ ] Double-click / Return opens editor (editor itself comes in Phase 5; stub sheet for now).
+- [ ] Drag to reorder (`.onMove`) updates `order` and persists (D5).
+- [ ] Toolbar: search field (rule name + folder name), Filter menu (Enabled / Disabled / Has errors; Trigger type; Folder), Sort menu (Manual, Name, Last run, Date created; non-manual disables drag and shows a hint), Activity button, `+` menu (New rule, New from template ▸).
+- [ ] Empty state: short message, 3 template buttons, "Create blank rule".
+- [ ] Bulk guard and apply-to-existing prompts presented as alerts/sheets from `EngineController` requests.
+- [ ] Keyboard navigation and VoiceOver labels on rows and controls.
+
+### 4.4 Tests
+- [ ] UI test: toggle a rule, reorder, delete with confirmation.
+- [ ] Unit tests for search/filter/sort logic (pure functions in a view model).
+
+**Done when:** user manages rules entirely from the dashboard and menu bar (except editing), and state survives relaunch.
+
+---
+
+## Phase 5: Rule editor, preview, and templates
+
+Goal: the When / If / Then editor (D11) with live summary, live match count, preview, validation, and starter templates.
+
+### 5.1 Editor structure (spec §8.3)
+- [ ] Sheet over the dashboard. Works on a draft copy of the rule; Save writes back; Cancel discards (confirm if dirty). ⌘S saves, Esc cancels.
+- [ ] Header: name field (auto-generated until the user edits it) + live summary sentence.
+- [ ] Footer: "More options" disclosure (stop other rules, notify on each run, notes), Cancel, Save Rule.
+
+### 5.2 WHEN card
+- [ ] Trigger popup: File added (default), Schedule options, and "More triggers" disclosure for File modified / File removed (spec §3.1).
+- [ ] Schedule controls: interval (number + minutes/hours, min 5 min), daily time picker, weekly day toggles + time.
+- [ ] Folder list: folder picker via `NSOpenPanel` (can choose directories only), drag-in from Finder (`.dropDestination(for: URL.self)`), path display tilde-abbreviated, `[+ folder]`.
+- [ ] TCC explainer: the first time the user picks Desktop, Documents, Downloads, iCloud Drive, or a removable/network volume, show a short explainer before touching the folder (spec §10).
+- [ ] Options disclosure: Include subfolders, Include hidden files.
+
+### 5.3 IF card
+- [ ] Top-level All/Any popup.
+- [ ] Condition row: attribute popup → operator popup (filtered by validity table) → value control by type (text field, extension list, kind popup, number + unit, number + duration unit, date picker, tag token field, none for Any file). Remove / add buttons.
+- [ ] Add group: one nested level in the UI (D12). Nested group has its own All/Any popup.
+- [ ] Empty conditions hint: "Matches all files in this folder" (warning style).
+- [ ] Age-condition hint on file-event rules (spec §4.2 notes).
+- [ ] Live match count: debounced (~400 ms) background `plan(rule:)` call against current scope; "Matches N files right now" + Preview button.
+
+### 5.4 THEN card
+- [ ] Ordered action list with drag handle `≡` and remove button.
+- [ ] Action popup + per-action parameters: folder picker, conflict policy popup, pattern field with token chips and live preview against a sample file from scope, tag field, unarchive options, app picker for Open, message template.
+- [ ] File removed trigger: only Notify-style actions selectable (spec §3.1).
+
+### 5.5 Validation (spec §8.3)
+- [ ] At least one folder; at least one action; all required parameters set; trigger/action compatibility; Move destination equals source → warning (not error) if a Rename comes first.
+- [ ] Destructive warning banner when actions include Move to Trash or Replace policy and conditions are empty.
+- [ ] Unknown tokens in patterns flagged.
+- [ ] Validation logic lives in `MFPeteCore` (`RuleValidator`) and is unit tested.
+
+### 5.6 Preview
+- [ ] Preview sheet listing matching files and each planned step ("invoice.pdf → Documents/pdf/invoice.pdf"). No changes made.
+- [ ] Reused for dashboard "Preview Matches", bulk guard "Preview", and apply-to-existing "Preview".
+
+### 5.7 Templates (spec §8.6)
+- [ ] Define the 6 templates as factory functions in `MFPeteCore` (folders left empty or pre-set to standard paths where obvious, like `~/Downloads`).
+- [ ] Note: template 1 mixes "file added" with a daily schedule in the spec; implement it as a **daily schedule** rule on Downloads (age condition only makes sense on schedules, spec §4.2).
+- [ ] Wire into empty state and `+` menu "New from template ▸". Template opens the editor pre-filled; user confirms folders and saves.
+
+### 5.8 Tests
+- [ ] UI tests: create rule from template, edit and save, preview shows expected files (spec §15).
+- [ ] `RuleValidator` unit tests for each rule.
+- [ ] Measure goal: "clean my Downloads" rule from launch in under 60 s (manual check, spec §1.1).
+
+**Done when:** a new user can build any v1 rule in the editor, see what it will do, and save it.
+
+---
+
+## Phase 6: Activity log, settings, onboarding, and permissions
+
+Goal: complete the remaining v1 surfaces so the app is trustworthy and self-explanatory.
+
+### 6.1 Activity log window (spec §8.4)
+- [ ] `Window("Activity", id: "activity")` with a `Table`: Time, Rule, Action, File, Result (✓ / ⚠︎ / ✕), Details.
+- [ ] Filters: by rule, by result. Opening from a rule's "Show Activity" pre-filters.
+- [ ] Row actions: Reveal in Finder (if file exists), Copy path, Open rule.
+- [ ] "Clear log" (confirm). Retention settings applied by the pruning task.
+- [ ] Efficient queries with `FetchDescriptor` limits and sort by timestamp (10,000 rows max).
+
+### 6.2 Notifications
+- [ ] `NotificationService` using `UNUserNotificationCenter`.
+- [ ] Global setting: Off / Errors only (default) / Every run.
+- [ ] Per-rule "Notify on each run" summary ("Clean Downloads: 3 files moved to Trash").
+- [ ] Show notification action, loop-guard alert, disk-full and missing-destination errors.
+- [ ] App works fully without notification permission.
+
+### 6.3 Settings scene (spec §8.5)
+- [ ] **General:** Launch at login (`SMAppService.mainApp.register()/unregister()`, reflect real status including "Requires approval"); Show icon in Dock (`NSApp.setActivationPolicy(.regular/.accessory)`, persisted, applied at launch); Notifications level.
+- [ ] **Folders:** list of all scope folders, the rules using each, status (OK / missing / no permission / unavailable), Reveal in Finder, "Open Privacy & Security" button (`x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders`).
+- [ ] **Advanced:** settle delay (1–30 s), bulk guard threshold, log retention (days + max entries), Export all rules, Import rules, Reset processed-file history (confirm).
+- [ ] **About:** version, MIT license, GitHub link. Sparkle controls come in Phase 7 (leave a placeholder).
+
+### 6.4 Import / export (spec §9)
+- [ ] Export one rule (dashboard `⋯`) or all rules (Settings) via `NSSavePanel` to `.json` with the `rules.json` schema, paths tilde-abbreviated.
+- [ ] Import via `NSOpenPanel`: migrate older versions, assign new IDs to avoid collisions, append at end of order, import **disabled**. Unknown types → disabled with warning. Missing folders show "Folder missing".
+
+### 6.5 Onboarding (spec §8.7)
+- [ ] First-launch window with three steps: what MFPete does (When/If/Then picture), Launch at login toggle (default on) + notification permission request, "Create your first rule" templates or Skip.
+- [ ] After closing: one-time popover/hint pointing at the menu bar icon (a small borderless panel anchored near the status item is acceptable, since `MenuBarExtra` exposes no anchor).
+- [ ] Store `hasCompletedOnboarding`.
+
+### 6.6 Permissions and error states (spec §10, §13)
+- [ ] Central folder-status checker used by engine, dashboard badges, menu bar dot, and Settings › Folders.
+- [ ] Error table from spec §13 fully covered: destination missing, permission denied, vanished file, disk full, unarchive failure, loop detected, corrupt rules file alert.
+- [ ] Corrupt rules file alert on launch (from Phase 1.4 flag).
+
+### 6.7 Accessibility and polish
+- [ ] VoiceOver labels on all custom controls; full keyboard navigation in editor and dashboard.
+- [ ] Light/dark mode check on every screen.
+- [ ] All strings in the String Catalog.
+
+**Done when:** every v1 bullet in spec §16 except distribution works end to end.
+
+---
+
+## Phase 7: Distribution, updates, and release
+
+Goal: signed, notarized builds on GitHub Releases, Sparkle updates, Homebrew cask, and a release-ready repo (D10, spec §14).
+
+### 7.1 Sparkle 2
+- [ ] Add Sparkle 2 via SPM to the app target.
+- [ ] Generate EdDSA keys with Sparkle's `generate_keys`; store the private key in the macOS Keychain locally and as a GitHub Actions secret. Put `SUPublicEDKey` and `SUFeedURL` (GitHub-hosted `appcast.xml`) in Info.plist.
+- [ ] `SPUStandardUpdaterController` owned by the app; "Check for Updates…" in Settings › About (and optionally in the menu bar menu); "Automatically check for updates" toggle bound to `updater.automaticallyChecksForUpdates` (on by default).
+- [ ] Confirm Sparkle works with sandbox off (no XPC installer services needed).
+
+### 7.2 Signing and notarization
+- [ ] Apple Developer Program account and Developer ID Application certificate.
+- [ ] Hardened Runtime on; no extra entitlements needed (sandbox off).
+- [ ] Release build script: `xcodebuild archive` → export with Developer ID → `notarytool submit --wait` → `stapler staple`.
+- [ ] Package `.dmg` (manual download) and `.zip` (Sparkle) from the stapled app.
+
+### 7.3 GitHub Actions
+- [ ] CI workflow on push/PR: build app, run `MFPeteCore` tests and app unit tests.
+- [ ] Release workflow on tag push (`v*`): import signing certificate into a temp keychain, archive, notarize, staple, build `.dmg` + `.zip`, sign the zip with Sparkle's `sign_update`, update `appcast.xml`, create GitHub Release with assets.
+
+### 7.4 Homebrew cask
+- [ ] Draft `mfpete.rb` cask (token `mfpete`, `auto_updates true`, `depends_on macos: ">= :sonoma"`, `zap` stanza for `~/Library/Application Support/MFPete` and preferences).
+- [ ] Submit to `homebrew/cask` after first public release meets their notability requirements; until then, document direct download.
+
+### 7.5 Repo and docs
+- [ ] README: screenshots, what it does, templates, privacy statement (only network traffic is Sparkle update check), install (Homebrew + DMG), build instructions.
+- [ ] CONTRIBUTING.md and GitHub issue templates (bug, feature).
+- [ ] Verify all dependencies are MIT/BSD/Apache compatible.
+
+### 7.6 Release validation
+- [ ] Performance check against spec §5.8: idle CPU ~0%, under 60 MB resident with 20 rules, 5,000-item scan under 2 s (Instruments + a perf test in `MFPeteCore`).
+- [ ] Clean-machine test on macOS 14 and current macOS: install from DMG, Gatekeeper passes, onboarding, TCC prompts, update from previous version via Sparkle.
+- [ ] Tag `v1.0.0`.
+
+**Done when:** a user can `brew install --cask mfpete` (or download the DMG), launch without Gatekeeper warnings, and receive a Sparkle update.
+
+---
+
+## Open Notes and Risks
+
+- **FSEvents + Swift concurrency:** keep the C callback as a thin bridge into an `AsyncStream`; all state lives in the engine actor (D13).
+- **MainActor default isolation:** the app target defaults to MainActor. Engine code must stay in `MFPeteCore` (no default isolation) to avoid accidental main-thread file work.
+- **SwiftData from an actor:** use `@ModelActor` for writes; avoid passing `@Model` objects across actors (pass IDs or value snapshots).
+- **Template 1 ambiguity:** spec mixes "file added" with a daily schedule. Plan uses a daily schedule rule (Phase 5.7).
+- **Homebrew notability:** official `homebrew/cask` may reject a brand-new app. Fallback: a personal tap until notability is met.
+- **`fileIdentifierKey` availability:** listed as macOS 13.3+; deployment target 14 covers it.

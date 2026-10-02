@@ -15,6 +15,8 @@ final class AppState {
     /// Rules loaded disabled because they contain unknown parts.
     var disabledUnknownRules: [String] = []
     var lastSaveError: String?
+    /// Expands `~` in template folders. UI tests point it at a temporary folder.
+    var templateHome = FolderRef.homePath
 
     /// Runs rules and mirrors engine state for the UI.
     let engineController: EngineController

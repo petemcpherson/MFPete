@@ -9,7 +9,7 @@
 - [x] Phase 2: Rule engine core (conditions, actions, run pipeline)
 - [x] Phase 3: Triggers, file watching, and engine safety
 - [x] Phase 4: Menu bar and dashboard UI
-- [ ] Phase 5: Rule editor, preview, and templates
+- [x] Phase 5: Rule editor, preview, and templates
 - [ ] Phase 6: Activity log, settings, onboarding, and permissions
 - [ ] Phase 7: Distribution, updates, and release
 
@@ -322,55 +322,67 @@ Goal: the user can see, toggle, reorder, search, run, duplicate, and delete rule
 
 ---
 
-## Phase 5: Rule editor, preview, and templates
+## Phase 5: Rule editor, preview, and templates [COMPLETED]
 
 Goal: the When / If / Then editor (D11) with live summary, live match count, preview, validation, and starter templates.
 
 ### 5.1 Editor structure (spec §8.3)
-- [ ] Sheet over the dashboard. Works on a draft copy of the rule; Save writes back; Cancel discards (confirm if dirty). ⌘S saves, Esc cancels.
-- [ ] Header: name field (auto-generated until the user edits it) + live summary sentence.
-- [ ] Footer: "More options" disclosure (stop other rules, notify on each run, notes), Cancel, Save & Run, Save Rule.
-- [ ] Save & Run (D14): validate, save, close the sheet, then call `EngineController.runNow`. Disabled for "File removed" rules.
+- [x] Sheet over the dashboard. Works on a draft copy of the rule; Save writes back; Cancel discards (confirm if dirty). ⌘S saves, Esc cancels.
+- [x] Header: name field (auto-generated until the user edits it) + live summary sentence.
+- [x] Footer: "More options" disclosure (stop other rules, notify on each run, notes), Cancel, Save & Run, Save Rule.
+- [x] Save & Run (D14): validate, save, close the sheet, then call `EngineController.runNow`. Disabled for "File removed" rules.
 
 ### 5.2 WHEN card
-- [ ] Trigger popup: File added (default), Schedule options, and "More triggers" disclosure for File modified / File removed (spec §3.1).
-- [ ] Schedule controls: interval (number + minutes/hours, min 5 min), daily time picker, weekly day toggles + time.
-- [ ] Folder list: folder picker via `NSOpenPanel` (can choose directories only), drag-in from Finder (`.dropDestination(for: URL.self)`), path display tilde-abbreviated, `[+ folder]`.
-- [ ] TCC explainer: the first time the user picks Desktop, Documents, Downloads, iCloud Drive, or a removable/network volume, show a short explainer before touching the folder (spec §10).
-- [ ] Options disclosure: Include subfolders, Include hidden files.
+- [x] Trigger popup: File added (default), Schedule options, and "More triggers" disclosure for File modified / File removed (spec §3.1).
+- [x] Schedule controls: interval (number + minutes/hours, min 5 min), daily time picker, weekly day toggles + time.
+- [x] Folder list: folder picker via `NSOpenPanel` (can choose directories only), drag-in from Finder (`.dropDestination(for: URL.self)`), path display tilde-abbreviated, `[+ folder]`.
+- [x] TCC explainer: the first time the user picks Desktop, Documents, Downloads, iCloud Drive, or a removable/network volume, show a short explainer before touching the folder (spec §10).
+- [x] Options disclosure: Include subfolders, Include hidden files.
 
 ### 5.3 IF card
-- [ ] Top-level All/Any popup.
-- [ ] Condition row: attribute popup → operator popup (filtered by validity table) → value control by type (text field, extension list, kind popup, number + unit, number + duration unit, date picker, tag token field, none for Any file). Remove / add buttons.
-- [ ] Add group: one nested level in the UI (D12). Nested group has its own All/Any popup.
-- [ ] Empty conditions hint: "Matches all files in this folder" (warning style).
-- [ ] Age-condition hint on file-event rules (spec §4.2 notes).
-- [ ] Live match count: debounced (~400 ms) background `plan(rule:)` call against current scope; "Matches N files right now" + Preview button.
+- [x] Top-level All/Any popup.
+- [x] Condition row: attribute popup → operator popup (filtered by validity table) → value control by type (text field, extension list, kind popup, number + unit, number + duration unit, date picker, tag token field, none for Any file). Remove / add buttons.
+- [x] Add group: one nested level in the UI (D12). Nested group has its own All/Any popup.
+- [x] Empty conditions hint: "Matches all files in this folder" (warning style).
+- [x] Age-condition hint on file-event rules (spec §4.2 notes).
+- [x] Live match count: debounced (~400 ms) background `plan(rule:)` call against current scope; "Matches N files right now" + Preview button.
 
 ### 5.4 THEN card
-- [ ] Ordered action list with drag handle `≡` and remove button.
-- [ ] Action popup + per-action parameters: folder picker, conflict policy popup, pattern field with token chips and live preview against a sample file from scope, tag field, unarchive options, app picker for Open, message template.
-- [ ] File removed trigger: only Notify-style actions selectable (spec §3.1).
+- [x] Ordered action list with drag handle `≡` and remove button.
+- [x] Action popup + per-action parameters: folder picker, conflict policy popup, pattern field with token chips and live preview against a sample file from scope, tag field, unarchive options, app picker for Open, message template.
+- [x] File removed trigger: only Notify-style actions selectable (spec §3.1).
 
 ### 5.5 Validation (spec §8.3)
-- [ ] At least one folder; at least one action; all required parameters set; trigger/action compatibility; Move destination equals source → warning (not error) if a Rename comes first.
-- [ ] Destructive warning banner when actions include Move to Trash or Replace policy and conditions are empty.
-- [ ] Unknown tokens in patterns flagged.
-- [ ] Validation logic lives in `MFPeteCore` (`RuleValidator`) and is unit tested.
+- [x] At least one folder; at least one action; all required parameters set; trigger/action compatibility; Move destination equals source → warning (not error) if a Rename comes first.
+- [x] Destructive warning banner when actions include Move to Trash or Replace policy and conditions are empty.
+- [x] Unknown tokens in patterns flagged.
+- [x] Validation logic lives in `MFPeteCore` (`RuleValidator`) and is unit tested.
 
 ### 5.6 Preview
-- [ ] Preview sheet listing matching files and each planned step ("invoice.pdf → Documents/pdf/invoice.pdf"). No changes made.
-- [ ] Reused for dashboard "Preview Matches", bulk guard "Preview", and apply-to-existing "Preview".
+- [x] Preview sheet listing matching files and each planned step ("invoice.pdf → Documents/pdf/invoice.pdf"). No changes made.
+- [x] Reused for dashboard "Preview Matches", bulk guard "Preview", and apply-to-existing "Preview".
 
 ### 5.7 Templates (spec §8.6)
-- [ ] Define the 6 templates as factory functions in `MFPeteCore` (folders left empty or pre-set to standard paths where obvious, like `~/Downloads`).
-- [ ] Note: template 1 mixes "file added" with a daily schedule in the spec; implement it as a **daily schedule** rule on Downloads (age condition only makes sense on schedules, spec §4.2).
-- [ ] Wire into empty state and `+` menu "New from template ▸". Template opens the editor pre-filled; user confirms folders and saves.
+- [x] Define the 6 templates as factory functions in `MFPeteCore` (folders left empty or pre-set to standard paths where obvious, like `~/Downloads`).
+- [x] Note: template 1 mixes "file added" with a daily schedule in the spec; implement it as a **daily schedule** rule on Downloads (age condition only makes sense on schedules, spec §4.2).
+- [x] Wire into empty state and `+` menu "New from template ▸". Template opens the editor pre-filled; user confirms folders and saves.
 
 ### 5.8 Tests
-- [ ] UI tests: create rule from template, edit and save, preview shows expected files (spec §15).
-- [ ] `RuleValidator` unit tests for each rule.
-- [ ] Measure goal: "clean my Downloads" rule from launch in under 60 s (manual check, spec §1.1).
+- [x] UI tests: create rule from template, edit and save, preview shows expected files (spec §15).
+- [x] `RuleValidator` unit tests for each rule.
+- [ ] Measure goal: "clean my Downloads" rule from launch in under 60 s (manual check, spec §1.1). Not yet timed by hand.
+
+**Implementation notes (decisions made in Phase 5):**
+- Editor files live in `MFPete/Editor/` (`RuleEditorSheet`, `WhenCard`, `IfCard`, `ThenCard`, `EditorControls`, `PreviewSheet`). Popup choices and labels (`TriggerType`, `ActionType`, `Attribute`/`Operator` display names, `Condition.changingAttribute/Operator`) live in `MFPeteCore` (`Model/EditorChoices.swift`) so they are unit tested.
+- `RuleValidator` returns `RuleIssue`s (error / warning, a `Code`, a message, and an optional action index). Errors block Save and appear after the first Save attempt; warnings (unknown tokens, move into source after a rename, destructive banner) show right away.
+- Move into a scope folder is an error unless a Rename or Change extension comes first (then a warning).
+- "More triggers" is a link button that adds File modified / File removed to the trigger popup; it stays open when the rule already uses one.
+- Tag fields are comma-separated text fields, not `NSTokenField`.
+- Age hint covers only relative dates ("in the last" / "not in the last") on file-event rules.
+- TCC explainer: `FolderGate` shows a one-time alert per `ProtectedLocation` (Desktop, Documents, Downloads, iCloud Drive, removable/network volumes) before the folder is used. Shown locations are stored in `UserDefaults` (`explainedProtectedLocations`).
+- Live match count and pattern previews: a 400 ms debounced `plan(rule:)` on scope/trigger/conditions/options changes; the sample file is the first file (not folder) in scope.
+- Actions reorder by dragging the `≡` handle onto another row; VoiceOver gets Move Up / Move Down actions.
+- Templates were already factory functions in `MFPeteCore` (Phase 4). `AppState.templateHome` expands their `~` paths; UI tests point it at a temporary folder. `--ui-testing-empty` starts the fixture with no rules.
 
 **Done when:** a new user can build any v1 rule in the editor, see what it will do, and save it.
 

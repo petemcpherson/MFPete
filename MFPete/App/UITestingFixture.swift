@@ -4,9 +4,13 @@ import SwiftData
 
 /// Isolated state for UI tests, chosen with the `--ui-testing` launch
 /// argument: rules, data store, and settings live in a fresh temporary
-/// folder, so tests never touch the user's real rules.
+/// folder, so tests never touch the user's real rules. Adding
+/// `--ui-testing-empty` starts with no rules (the empty dashboard).
+/// Templates expand `~` to the temporary folder, which has an empty
+/// `Downloads` folder, so tests never touch the user's real folders.
 enum UITestingFixture {
     static let launchArgument = "--ui-testing"
+    static let emptyArgument = "--ui-testing-empty"
 
     static var isActive: Bool {
         ProcessInfo.processInfo.arguments.contains(launchArgument)
@@ -18,13 +22,15 @@ enum UITestingFixture {
             .appendingPathComponent("MFPeteUITests-\(UUID().uuidString)", isDirectory: true)
         let inbox = root.appendingPathComponent("Inbox", isDirectory: true)
         try? fileManager.createDirectory(at: inbox, withIntermediateDirectories: true)
+        try? fileManager.createDirectory(at: root.appendingPathComponent("Downloads", isDirectory: true), withIntermediateDirectories: true)
         for name in ["note1.txt", "note2.txt"] {
             try? Data("MFPete".utf8).write(to: inbox.appendingPathComponent(name))
         }
 
         let folder = FolderRef(path: inbox.path)
         let tag = Action.addTags(["MFPete UI Test"])
-        let rules = [
+        let startsEmpty = ProcessInfo.processInfo.arguments.contains(emptyArgument)
+        let rules = startsEmpty ? [] : [
             Rule(
                 name: "Alpha",
                 order: 0,
@@ -54,6 +60,7 @@ enum UITestingFixture {
 
         let container = try? DataStore.makeInMemoryContainer()
         let state = AppState(rulesStore: store, modelContainer: container, defaults: defaults)
+        state.templateHome = root.path
         state.openWindow(WindowID.rules)
         return state
     }

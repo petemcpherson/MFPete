@@ -133,7 +133,7 @@ struct RulesWindow: View {
     }
 
     private func newRule(from template: RuleTemplate? = nil) {
-        editing = EditorTarget(rule: template?.makeRule() ?? Rule(), isNew: true)
+        editing = EditorTarget(rule: template?.makeRule(home: appState.templateHome) ?? Rule(), isNew: true)
     }
 
     /// Drag reorder, only on the full list in manual order.
@@ -358,6 +358,7 @@ private struct EmptyRulesView: View {
                         .padding(.vertical, 4)
                     }
                     .buttonStyle(.bordered)
+                    .accessibilityIdentifier("template-\(template.id)")
                 }
             }
             .frame(width: 340)

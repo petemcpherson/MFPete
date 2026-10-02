@@ -130,7 +130,7 @@ private struct PreviewRow: View {
         switch step.outcome {
         case .willSucceed:
             guard let destination = step.destination else { return name }
-            return "→ " + FolderRef(path: destination.path).tildeAbbreviated()
+            return "\(name) → " + FolderRef(path: destination.path).tildeAbbreviated()
         case .willSkip(let reason):
             return String(localized: "\(name): skipped (\(reason))")
         case .willFail(let reason):

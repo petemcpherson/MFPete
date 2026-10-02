@@ -8,7 +8,7 @@
 - [x] Phase 1: Project foundation and data layer
 - [x] Phase 2: Rule engine core (conditions, actions, run pipeline)
 - [x] Phase 3: Triggers, file watching, and engine safety
-- [ ] Phase 4: Menu bar and dashboard UI
+- [x] Phase 4: Menu bar and dashboard UI
 - [ ] Phase 5: Rule editor, preview, and templates
 - [ ] Phase 6: Activity log, settings, onboarding, and permissions
 - [ ] Phase 7: Distribution, updates, and release
@@ -274,37 +274,49 @@ Goal: rules fire automatically from file events and schedules, safely, with loop
 
 ---
 
-## Phase 4: Menu bar and dashboard UI
+## Phase 4: Menu bar and dashboard UI [COMPLETED]
 
 Goal: the user can see, toggle, reorder, search, run, duplicate, and delete rules, and the menu bar reflects live state.
 
 ### 4.1 App ↔ engine bridge
-- [ ] `EngineController` (`@MainActor @Observable`) owns the `RuleEngine` actor, pushes rule changes to it, and exposes UI state: paused, per-rule status (OK / error / folder missing / no permission), per-rule `isRunning`, pending bulk/apply requests, recent activity.
-- [ ] `EngineController.runNow(_ ruleID:)` used by every Run Now entry point (row button, row menu, menu bar submenu, editor Save & Run). Hands the `RunSummary` to `NotificationService` (Phase 6.2).
-- [ ] Error badge clears on the next successful run or when the user opens the rule (spec §13).
+- [x] `EngineController` (`@MainActor @Observable`) owns the `RuleEngine` actor, pushes rule changes to it, and exposes UI state: paused, per-rule status (OK / error / folder missing / no permission), per-rule `isRunning`, pending bulk/apply requests, recent activity.
+- [x] `EngineController.runNow(_ ruleID:)` used by every Run Now entry point (row button, row menu, menu bar submenu, editor Save & Run). Hands the `RunSummary` to `NotificationService` (Phase 6.2).
+- [x] Error badge clears on the next successful run or when the user opens the rule (spec §13).
 
 ### 4.2 Menu bar extra (spec §8.1)
-- [ ] Header: "MFPete — N rules active" (disabled item).
-- [ ] Recent activity: last 3–5 entries with relative time; click reveals in Finder.
-- [ ] Pause all rules (⌘P), Run rule ▸ submenu, Open Rules… (⌘R), Settings… (⌘,), Quit (⌘Q).
-- [ ] Run rule ▸ lists all rules, including disabled ones (D14). "File removed" rules show disabled. Feedback comes from the summary notification, since no window is open.
-- [ ] Icon: template SF Symbol `tray.and.arrow.down`; paused variant; badge dot when any rule has an unresolved error.
-- [ ] Opening a window from the menu activates the app (accessory mode).
+- [x] Header: "MFPete — N rules active" (disabled item).
+- [x] Recent activity: last 3–5 entries with relative time; click reveals in Finder.
+- [x] Pause all rules (⌘P), Run rule ▸ submenu, Open Rules… (⌘R), Settings… (⌘,), Quit (⌘Q).
+- [x] Run rule ▸ lists all rules, including disabled ones (D14). "File removed" rules show disabled. Feedback comes from the summary notification, since no window is open.
+- [x] Icon: template SF Symbol `tray.and.arrow.down`; paused variant; badge dot when any rule has an unresolved error.
+- [x] Opening a window from the menu activates the app (accessory mode).
 
 ### 4.3 Dashboard window (spec §8.2)
-- [ ] Single `List` with custom rows: toggle, name, summary (2 lines from `RuleSummarizer`), last run, lifetime file count, error badge.
-- [ ] Run Now button on every row (D14, spec §3.3): `play.fill` borderless button, always visible, left of `⋯`. Shows a `ProgressView` spinner while `isRunning`. Disabled with tooltip for "File removed" rules. VoiceOver label "Run <rule name> now". "Last run" updates when the run finishes.
-- [ ] Row `⋯` menu: Edit, Run Now, Preview Matches, Duplicate, Export…, Show Activity, Run Again on All Files, Delete (confirm).
-- [ ] Double-click / Return opens editor (editor itself comes in Phase 5; stub sheet for now).
-- [ ] Drag to reorder (`.onMove`) updates `order` and persists (D5).
-- [ ] Toolbar: search field (rule name + folder name), Filter menu (Enabled / Disabled / Has errors; Trigger type; Folder), Sort menu (Manual, Name, Last run, Date created; non-manual disables drag and shows a hint), Activity button, `+` menu (New rule, New from template ▸).
-- [ ] Empty state: short message, 3 template buttons, "Create blank rule".
-- [ ] Bulk guard and apply-to-existing prompts presented as alerts/sheets from `EngineController` requests.
-- [ ] Keyboard navigation and VoiceOver labels on rows and controls.
+- [x] Single `List` with custom rows: toggle, name, summary (2 lines from `RuleSummarizer`), last run, lifetime file count, error badge.
+- [x] Run Now button on every row (D14, spec §3.3): `play.fill` borderless button, always visible, left of `⋯`. Shows a `ProgressView` spinner while `isRunning`. Disabled with tooltip for "File removed" rules. VoiceOver label "Run <rule name> now". "Last run" updates when the run finishes.
+- [x] Row `⋯` menu: Edit, Run Now, Preview Matches, Duplicate, Export…, Show Activity, Run Again on All Files, Delete (confirm).
+- [x] Double-click / Return opens editor (editor itself comes in Phase 5; stub sheet for now).
+- [x] Drag to reorder (`.onMove`) updates `order` and persists (D5).
+- [x] Toolbar: search field (rule name + folder name), Filter menu (Enabled / Disabled / Has errors; Trigger type; Folder), Sort menu (Manual, Name, Last run, Date created; non-manual disables drag and shows a hint), Activity button, `+` menu (New rule, New from template ▸).
+- [x] Empty state: short message, 3 template buttons, "Create blank rule".
+- [x] Bulk guard and apply-to-existing prompts presented as alerts/sheets from `EngineController` requests.
+- [x] Keyboard navigation and VoiceOver labels on rows and controls.
 
 ### 4.4 Tests
-- [ ] UI test: toggle a rule, reorder, delete with confirmation, click Run Now and see "Last run" update.
-- [ ] Unit tests for search/filter/sort logic (pure functions in a view model).
+- [x] UI test: toggle a rule, reorder, delete with confirmation, click Run Now and see "Last run" update.
+- [x] Unit tests for search/filter/sort logic (pure functions in a view model).
+
+**Implementation notes (decisions made in Phase 4):**
+- `EngineController` (in `AppState.engineController`) now owns `RuleEngine` and `TriggerCoordinator`; `AppState` pushes rules through it. It refreshes statuses, stats, and the last 5 activity entries after every engine event and every run it starts, and when the Rules window appears (no polling).
+- Global pause is persisted in `UserDefaults` (`isPaused`) and applied at launch. Resuming with an enabled "File added" rule shows a "Scan Now" banner in the dashboard and a menu bar item.
+- Run results go to a `RunNotifier` protocol; `LoggingRunNotifier` only logs until Phase 6.2 adds real notifications. Bulk and apply-to-existing prompts open the Rules window if it is closed.
+- Duplicate inserts a disabled copy ("Name copy") directly below the original. "Run Again on All Files" resets processed records, then starts a Run Now (bulk guard applies).
+- Export… (one rule) is already wired with `NSSavePanel` (Phase 6.4 adds Export all / Import). "Show Activity" and the toolbar Activity button are present but disabled until the Activity window (Phase 6.1).
+- Drag reorder works only in Manual sort with no search or filter; otherwise a hint shows below the list.
+- `RuleTemplate` (6 templates, 3 featured) moved forward into `MFPeteCore` for the empty state and `+` menu. Templates without an obvious folder leave folder fields empty for the Phase 5 editor. Phase 5.7 only needs to wire them into the real editor.
+- `RuleEditorSheet` is a stub (name, enabled, summary sentence, Cancel / Save & Run / Save Rule, ⌘S, Esc). `PreviewSheet` is a working dry-run list reused by Preview Matches and both prompts; Phase 5.6 can refine it.
+- Menu bar icon is a template `NSImage`: dimmed with pause bars when paused, with a dot when any rule has an error status.
+- `--ui-testing` launch argument (`UITestingFixture`) gives the app isolated rules, an in-memory data store, a separate defaults suite, and opens the Rules window. App unit tests also use isolated stores now.
 
 **Done when:** user manages rules entirely from the dashboard and menu bar (except editing), and state survives relaunch.
 

@@ -16,40 +16,30 @@ final class AppState {
     var disabledUnknownRules: [String] = []
     var lastSaveError: String?
 
+    /// Runs rules and mirrors engine state for the UI.
+    let engineController: EngineController
     @ObservationIgnored let modelContainer: ModelContainer
     @ObservationIgnored private let rulesStore: RulesStore
-    /// Runs rules. Phase 4 wraps this in an engine controller for the UI.
-    @ObservationIgnored let engine: RuleEngine
-    /// Routes file events, schedules, and lifecycle events to the engine.
-    @ObservationIgnored let triggers: TriggerCoordinator
-    /// Rule pushes run in order, each after the previous one finished.
-    @ObservationIgnored private var rulesPush: Task<Void, Never>?
-    @ObservationIgnored private var eventLog: Task<Void, Never>?
     @ObservationIgnored private let logger = Logger(subsystem: "com.mftpete.MFPete", category: "AppState")
-    /// Set by a scene view, so code outside SwiftUI (the app delegate) can open windows.
-    @ObservationIgnored var windowOpener: ((String) -> Void)?
+    /// Set by a scene view, so code outside SwiftUI (the app delegate) can
+    /// open windows. A window asked for before then opens once it is set.
+    @ObservationIgnored var windowOpener: ((String) -> Void)? {
+        didSet {
+            guard let windowOpener, let pending = pendingWindow else { return }
+            pendingWindow = nil
+            windowOpener(pending)
+        }
+    }
+    @ObservationIgnored private var pendingWindow: String?
 
-    init(rulesStore: RulesStore = RulesStore()) {
+    init(
+        rulesStore: RulesStore = RulesStore(),
+        modelContainer: ModelContainer? = nil,
+        defaults: UserDefaults = .standard
+    ) {
         self.rulesStore = rulesStore
-        self.modelContainer = AppState.makeModelContainer()
-
-        let defaults = UserDefaults.standard
-        let threshold = defaults.object(forKey: SettingsKey.bulkThreshold) as? Int
-            ?? RuleEngine.Configuration.defaultBulkThreshold
-        let settleDelay = defaults.object(forKey: SettingsKey.settleDelay) as? Double ?? Settler.defaultDelay
-        engine = RuleEngine(
-            activityStore: ActivityStore(modelContainer: modelContainer),
-            processedStore: ProcessedStore(modelContainer: modelContainer),
-            environment: ActionEnvironment(workspace: AppWorkspaceService()),
-            configuration: RuleEngine.Configuration(bulkThreshold: threshold)
-        )
-        triggers = TriggerCoordinator(
-            engine: engine,
-            state: UserDefaultsEngineState(),
-            configuration: TriggerCoordinator.Configuration(
-                settleDelay: min(max(settleDelay, Settler.delayRange.lowerBound), Settler.delayRange.upperBound)
-            )
-        )
+        self.modelContainer = modelContainer ?? AppState.makeModelContainer()
+        engineController = EngineController(modelContainer: self.modelContainer, defaults: defaults)
 
         let result = rulesStore.load()
         rules = result.rules
@@ -58,11 +48,18 @@ final class AppState {
         if let issue = result.issue {
             logger.error("Rules file problem on load: \(String(describing: issue))")
         }
-        pushRulesToEngine()
+        engineController.setRules(rules)
+        engineController.onPromptNeeded = { [weak self] in
+            self?.openWindow(WindowID.rules)
+        }
     }
 
     var activeRuleCount: Int {
         rules.filter(\.isEnabled).count
+    }
+
+    func rule(_ id: Rule.ID) -> Rule? {
+        rules.first { $0.id == id }
     }
 
     // MARK: - Rule changes
@@ -89,6 +86,24 @@ final class AppState {
         persist()
     }
 
+    /// Inserts a disabled copy right below the original.
+    @discardableResult
+    func duplicate(_ id: Rule.ID) -> Rule? {
+        guard let index = rules.firstIndex(where: { $0.id == id }) else { return nil }
+        let original = rules[index]
+        let now = Date()
+        var copy = original
+        copy.id = UUID()
+        copy.name = String(localized: "\(original.name) copy")
+        copy.isEnabled = false
+        copy.createdAt = now
+        copy.modifiedAt = now
+        rules.insert(copy, at: index + 1)
+        renumber()
+        persist()
+        return copy
+    }
+
     func delete(_ ids: Set<Rule.ID>) {
         rules.removeAll { ids.contains($0.id) }
         renumber()
@@ -109,7 +124,7 @@ final class AppState {
     }
 
     private func persist() {
-        pushRulesToEngine()
+        engineController.setRules(rules)
         do {
             try rulesStore.save(rules)
             lastSaveError = nil
@@ -119,63 +134,15 @@ final class AppState {
         }
     }
 
-    // MARK: - Engine
-
-    /// Starts watching and scheduling. Called once at launch.
-    func startEngine() {
-        let triggers = triggers
-        let previous = rulesPush
-        rulesPush = Task {
-            await previous?.value
-            await triggers.start()
-        }
-        logEngineEvents()
-    }
-
-    /// Delivers pending events and saves the watcher position. Call before quitting.
-    func stopEngine() async {
-        await rulesPush?.value
-        await triggers.stop()
-    }
-
-    private func pushRulesToEngine() {
-        let triggers = triggers
-        let snapshot = rules
-        let previous = rulesPush
-        rulesPush = Task {
-            await previous?.value
-            await triggers.setRules(snapshot)
-        }
-    }
-
-    /// Until the dashboard and notifications exist (Phases 4 and 6), engine
-    /// events are only logged. Unanswered prompts keep their safe default:
-    /// apply-to-existing stays "Only new files", bulk runs stay held.
-    private func logEngineEvents() {
-        guard eventLog == nil else { return }
-        let events = engine.events
-        let logger = logger
-        eventLog = Task.detached(priority: .utility) {
-            for await event in events {
-                switch event {
-                case .runFinished(let summary):
-                    logger.info("Run finished: \(summary.ruleName, privacy: .public) acted on \(summary.actedOn) files, \(summary.failed) failed")
-                case .bulkApprovalRequested(let request):
-                    logger.notice("Bulk run held: \(request.ruleName, privacy: .public) wants to act on \(request.fileCount) files")
-                case .applyExistingRequested(let request):
-                    logger.notice("Apply to existing: \(request.ruleName, privacy: .public) matches \(request.fileCount) files")
-                case .loopDetected(let alert):
-                    logger.error("\(alert.message, privacy: .public)")
-                }
-            }
-        }
-    }
-
     // MARK: - Windows
 
     /// Opens a window and brings the app to front (needed in accessory mode).
     func openWindow(_ id: String) {
-        windowOpener?(id)
+        if let windowOpener {
+            windowOpener(id)
+        } else {
+            pendingWindow = id
+        }
         AppActivation.bringToFront()
     }
 
@@ -203,10 +170,11 @@ final class AppState {
     }
 }
 
-/// `UserDefaults` keys for engine settings (Settings › Advanced, Phase 6).
+/// `UserDefaults` keys for app and engine settings (Settings › Advanced, Phase 6).
 enum SettingsKey {
     static let settleDelay = "settleDelay"
     static let bulkThreshold = "bulkGuardThreshold"
+    static let isPaused = "isPaused"
 }
 
 enum AppActivation {

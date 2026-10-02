@@ -2,7 +2,7 @@ import AppKit
 import MFPeteCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    let appState = AppState()
+    let appState = UITestingFixture.isActive ? UITestingFixture.makeAppState() : AppState()
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         if SingleInstance.handOffToRunningInstance() {
@@ -15,7 +15,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appState.openWindow(WindowID.rules)
         }
         appState.pruneActivityLog()
-        appState.startEngine()
+        appState.engineController.start()
         observeWorkspace()
     }
 
@@ -23,7 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let appState = appState
         Task {
-            await appState.stopEngine()
+            await appState.engineController.stop()
             NSApp.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -33,7 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// on external volumes (spec §11).
     private func observeWorkspace() {
         let center = NSWorkspace.shared.notificationCenter
-        let triggers = appState.triggers
+        let triggers = appState.engineController.triggers
         center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
             Task { await triggers.handleWake() }
         }
@@ -68,8 +68,9 @@ enum SingleInstance {
 
     /// Returns true if another instance is running and was asked to come forward.
     static func handOffToRunningInstance() -> Bool {
-        // Unit tests launch the app as a test host; never quit those.
-        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+        // Unit tests launch the app as a test host, and UI tests use their own
+        // isolated state; never quit those.
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil || UITestingFixture.isActive {
             return false
         }
         guard let bundleID = Bundle.main.bundleIdentifier else { return false }

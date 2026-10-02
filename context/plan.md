@@ -7,7 +7,7 @@
 
 - [x] Phase 1: Project foundation and data layer
 - [x] Phase 2: Rule engine core (conditions, actions, run pipeline)
-- [ ] Phase 3: Triggers, file watching, and engine safety
+- [x] Phase 3: Triggers, file watching, and engine safety
 - [ ] Phase 4: Menu bar and dashboard UI
 - [ ] Phase 5: Rule editor, preview, and templates
 - [ ] Phase 6: Activity log, settings, onboarding, and permissions
@@ -205,56 +205,70 @@ Goal: given a rule and a list of candidate files, the engine evaluates condition
 
 ---
 
-## Phase 3: Triggers, file watching, and engine safety
+## Phase 3: Triggers, file watching, and engine safety [COMPLETED]
 
 Goal: rules fire automatically from file events and schedules, safely, with loop and bulk protection.
 
 ### 3.1 FSEvents watcher (spec §5.1)
-- [ ] `FSEventsWatcher` wrapping `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagNoDefer`, dispatch queue delivery (`FSEventStreamSetDispatchQueue`).
-- [ ] One stream for the union of enabled rules' scope folders. Rebuild when the set changes (rule add/edit/enable/disable/delete).
-- [ ] C callback bridges into an `AsyncStream<[FileEvent]>` consumed by the engine actor (D13: keep the C boundary small, mark it `@unchecked Sendable` where needed).
-- [ ] Map flags to added / modified / removed. Treat rename pairs: item renamed into a scope folder = added, renamed out = removed.
-- [ ] Persist the last event ID (`UserDefaults`) on a throttle (for example every 5 s and on quit).
-- [ ] Launch: start from the stored event ID so missed events replay. On `kFSEventStreamEventFlagMustScanSubDirs`, `UserDropped`/`KernelDropped`, or event ID wrap, fall back to a full scan of affected folders compared against the processed-file record.
-- [ ] Filter events to direct children unless "Include subfolders" is on.
+- [x] `FSEventsWatcher` wrapping `FSEventStreamCreate` with `kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagNoDefer`, dispatch queue delivery (`FSEventStreamSetDispatchQueue`).
+- [x] One stream for the union of enabled rules' scope folders. Rebuild when the set changes (rule add/edit/enable/disable/delete).
+- [x] C callback bridges into an `AsyncStream<[FileEvent]>` consumed by the engine actor (D13: keep the C boundary small, mark it `@unchecked Sendable` where needed).
+- [x] Map flags to added / modified / removed. Treat rename pairs: item renamed into a scope folder = added, renamed out = removed.
+- [x] Persist the last event ID (`UserDefaults`) on a throttle (for example every 5 s and on quit).
+- [x] Launch: start from the stored event ID so missed events replay. On `kFSEventStreamEventFlagMustScanSubDirs`, `UserDropped`/`KernelDropped`, or event ID wrap, fall back to a full scan of affected folders compared against the processed-file record.
+- [x] Filter events to direct children unless "Include subfolders" is on.
 
 ### 3.2 Settling (spec §5.3)
-- [ ] `Settler` actor: per-path timer. A file becomes ready when size and modification date are unchanged for the settle delay (default 2 s, range 1–30 s).
-- [ ] Skip known in-progress names (`*.crdownload`, `*.download`, `*.part`, `*.partial`, `*.tmp`, `*.opdownload`, `.com.google.Chrome.*`). When the final name appears, it arrives as a new event.
-- [ ] Dataless cloud placeholders: if the action set needs file contents (Copy, Unarchive), wait until the file is downloaded; never trigger a download during scheduled scans unless an action needs contents (spec §12).
-- [ ] If the file disappears before settling, drop it silently.
+- [x] `Settler` actor: per-path timer. A file becomes ready when size and modification date are unchanged for the settle delay (default 2 s, range 1–30 s).
+- [x] Skip known in-progress names (`*.crdownload`, `*.download`, `*.part`, `*.partial`, `*.tmp`, `*.opdownload`, `.com.google.Chrome.*`). When the final name appears, it arrives as a new event.
+- [x] Dataless cloud placeholders: if the action set needs file contents (Copy, Unarchive), wait until the file is downloaded; never trigger a download during scheduled scans unless an action needs contents (spec §12).
+- [x] If the file disappears before settling, drop it silently.
 
 ### 3.3 Trigger routing
-- [ ] File added → candidates from added events after settling.
-- [ ] File modified → debounced (reuse settle delay). Ignore modifications the engine itself made (self-change tracking from Phase 2.7).
-- [ ] File removed → no settle, no snapshot from disk. Evaluate name/extension/path conditions only; allow only Notify-style actions (editor enforces in Phase 5; engine also guards).
-- [ ] Chaining: items the engine creates/moves into a watched folder are suppressed for the producing rule only. Other rules see them as added (spec §5.4). Unarchive outputs count as added.
+- [x] File added → candidates from added events after settling.
+- [x] File modified → debounced (reuse settle delay). Ignore modifications the engine itself made (self-change tracking from Phase 2.7).
+- [x] File removed → no settle, no snapshot from disk. Evaluate name/extension/path conditions only; allow only Notify-style actions (editor enforces in Phase 5; engine also guards).
+- [x] Chaining: items the engine creates/moves into a watched folder are suppressed for the producing rule only. Other rules see them as added (spec §5.4). Unarchive outputs count as added.
 
 ### 3.4 Scheduler (spec §3.2)
-- [ ] `Scheduler` computes `nextFireDate(after:)` for interval (min 5 min), daily, and weekly triggers using `Calendar.current` (handles DST).
-- [ ] Single timer for the soonest next fire; recompute after each fire and on rule change.
-- [ ] Persist `lastScheduledRun` per rule (small JSON or `UserDefaults` keyed by rule ID).
-- [ ] Missed schedules: on launch and on wake, if a scheduled time passed while asleep/closed, run once and log "Ran late (missed 09:00)". No backlog.
-- [ ] Scheduled run = full scan of scope folders (same as Run Now).
+- [x] `Scheduler` computes `nextFireDate(after:)` for interval (min 5 min), daily, and weekly triggers using `Calendar.current` (handles DST).
+- [x] Single timer for the soonest next fire; recompute after each fire and on rule change.
+- [x] Persist `lastScheduledRun` per rule (small JSON or `UserDefaults` keyed by rule ID).
+- [x] Missed schedules: on launch and on wake, if a scheduled time passed while asleep/closed, run once and log "Ran late (missed 09:00)". No backlog.
+- [x] Scheduled run = full scan of scope folders (same as Run Now).
 
 ### 3.5 Lifecycle hooks (spec §11)
-- [ ] App target forwards `NSWorkspace.didWakeNotification` → engine: run missed schedules, restart stream if needed.
-- [ ] `didMountNotification` / `didUnmountNotification` → rules on that volume go "Folder unavailable" without error spam, resume on mount, rebuild stream.
-- [ ] Clean shutdown: flush event ID, stop stream.
+- [x] App target forwards `NSWorkspace.didWakeNotification` → engine: run missed schedules, restart stream if needed.
+- [x] `didMountNotification` / `didUnmountNotification` → rules on that volume go "Folder unavailable" without error spam, resume on mount, rebuild stream.
+- [x] Clean shutdown: flush event ID, stop stream.
 
 ### 3.6 Safety
-- [ ] Loop guard (spec §5.6): track runs per file key over 60 s. Over 10 runs → stop the chain, log "Possible rule loop between Rule A and Rule B", send notification. Disable nothing.
-- [ ] Bulk guard: if one run would act on more than the threshold (default 50), pause and emit a `BulkApprovalRequest` to the UI (Preview / Run / Cancel). Not applied to the first-enable prompt.
-- [ ] Global pause: engine flag. Events received while paused are discarded. On resume, UI offers "Scan now" for file-event rules. Manual `runNow` ignores the pause flag (D14).
-- [ ] Bulk guard also applies to manual runs.
-- [ ] Manual runs do not touch `lastScheduledRun` or the next fire date.
-- [ ] Apply-to-existing on enable (spec §3.4): when a file-event rule is created or enabled, engine counts current matches and emits a request to the UI (Preview / Apply / Only new files, default Only new files). "Only new files" writes processed records for current files so they are skipped.
-- [ ] "Run Again on All Files" per rule: delete that rule's processed records (D6).
+- [x] Loop guard (spec §5.6): track runs per file key over 60 s. Over 10 runs → stop the chain, log "Possible rule loop between Rule A and Rule B", send notification. Disable nothing.
+- [x] Bulk guard: if one run would act on more than the threshold (default 50), pause and emit a `BulkApprovalRequest` to the UI (Preview / Run / Cancel). Not applied to the first-enable prompt.
+- [x] Global pause: engine flag. Events received while paused are discarded. On resume, UI offers "Scan now" for file-event rules. Manual `runNow` ignores the pause flag (D14).
+- [x] Bulk guard also applies to manual runs.
+- [x] Manual runs do not touch `lastScheduledRun` or the next fire date.
+- [x] Apply-to-existing on enable (spec §3.4): when a file-event rule is created or enabled, engine counts current matches and emits a request to the UI (Preview / Apply / Only new files, default Only new files). "Only new files" writes processed records for current files so they are skipped.
+- [x] "Run Again on All Files" per rule: delete that rule's processed records (D6).
 
 ### 3.7 Tests (spec §15)
-- [ ] Integration tests with temp directories and a real FSEvents stream: add/modify/remove, settling (write a file in chunks), chaining across two rules, loop guard trips, bulk guard trips, pause discards.
-- [ ] Event ID replay: stop watcher, add files, restart from stored ID, verify catch-up.
-- [ ] Scheduler next-fire tests across DST transitions and weekday sets; missed-schedule logic with an injected clock.
+- [x] Integration tests with temp directories and a real FSEvents stream: add/modify/remove, settling (write a file in chunks), chaining across two rules, loop guard trips, bulk guard trips, pause discards.
+- [x] Event ID replay: stop watcher, add files, restart from stored ID, verify catch-up.
+- [x] Scheduler next-fire tests across DST transitions and weekday sets; missed-schedule logic with an injected clock.
+
+**Implementation notes (decisions made in Phase 3):**
+- `TriggerCoordinator` (actor in `MFPeteCore`) owns the `FSEventsWatcher`, `Settler`, schedule timer, and `EngineStateStore`; it routes triggers to `RuleEngine`. The app keeps one in `AppState` and forwards wake/mount/unmount and quit (`applicationShouldTerminate` → `.terminateLater` until `stop()` saves the event ID).
+- UI-facing results go out on `RuleEngine.events` (`EngineEvent`: `runFinished`, `bulkApprovalRequested`, `applyExistingRequested`, `loopDetected`). Only automatic runs that matched files or hit errors emit `runFinished`; runs the user started (Run Now, Apply, approved bulk) return their summary to the caller. Until Phase 4, `AppState` only logs these events.
+- FSEvents keeps the "created" flag on later writes to a recently created file. A created-and-changed event on an item born more than 2 s ago counts as modified (live events only, never during history replay; renames always count as added).
+- The stream always starts from an explicit event ID (stored, or the current one), so a rebuild never misses events. If the stored ID is newer than the system's current ID (FSEvents database reset), all "File added" rules get a fallback full scan.
+- Settled files arriving within 0.25 s run as one batch, so the bulk guard sees a large drop as one run. Bulk counts only files that match and are not already processed.
+- Loop guard chains follow the file key across moves, and engine-made copies inherit their source's chain (60 s), so copy ping-pong between two rules also trips it. Trips log one "Loop guard" failed entry and emit `loopDetected`; nothing is disabled.
+- Apply-to-existing: on create/enable, the engine immediately marks current matches processed (the "Only new files" default) and emits the request. "Apply" forgets those records and runs with `reason: .applyExisting`, skipping the bulk guard. Rules loaded at launch never prompt.
+- Newly enabled schedule rules start their clock at enable time (no catch-up for time spent disabled). Schedule fires while paused pass without a run and without later catch-up.
+- "Ran late (missed 9:00 AM)" is stored in each activity entry's `detail` and in `RunSummary.note`, not as a separate entry (keeps file-count stats exact).
+- Unmounted volumes: `FolderHealth.unavailable` / `RuleStatus.folderUnavailable` (not an error badge, no log entries).
+- "File removed" rules build a name-only snapshot; only Show notification actions run, others log as skipped. No processed records.
+- Settings keys read at launch: `settleDelay`, `bulkGuardThreshold` (UI in Phase 6).
 
 **Done when:** dropping a `.zip` into a watched folder with an Unarchive rule extracts it within ~3 seconds, and a daily rule runs once after wake if missed.
 

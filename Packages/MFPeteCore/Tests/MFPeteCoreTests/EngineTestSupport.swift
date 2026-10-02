@@ -117,7 +117,7 @@ struct EngineHarness {
     let engine: RuleEngine
     let environment: ActionEnvironment
 
-    init(now: Date? = nil) throws {
+    init(now: Date? = nil, clock: TestClock? = nil, configuration: RuleEngine.Configuration = RuleEngine.Configuration()) throws {
         sandbox = try Sandbox()
         trash = try FakeTrash(in: sandbox)
         let container = try DataStore.makeInMemoryContainer()
@@ -129,14 +129,88 @@ struct EngineHarness {
             notifier: notifier,
             trash: { try trash.trash($0) },
             calendar: utcCalendar,
-            now: { now ?? Date() }
+            now: { clock?.now ?? now ?? Date() }
         )
-        engine = RuleEngine(activityStore: activity, processedStore: processed, environment: environment)
+        engine = RuleEngine(activityStore: activity, processedStore: processed, environment: environment, configuration: configuration)
     }
 
     var executor: ActionExecutor { ActionExecutor(environment: environment) }
 
     func log() async throws -> [ActivityRecord] {
         try await activity.recent(limit: 1000)
+    }
+}
+
+/// Collects engine events in the background.
+final class EventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _events: [EngineEvent] = []
+    private var task: Task<Void, Never>?
+
+    init(_ engine: RuleEngine) {
+        let stream = engine.events
+        task = Task { [weak self] in
+            for await event in stream {
+                self?.append(event)
+            }
+        }
+    }
+
+    deinit { task?.cancel() }
+
+    private func append(_ event: EngineEvent) {
+        lock.lock(); _events.append(event); lock.unlock()
+    }
+
+    var events: [EngineEvent] {
+        lock.lock(); defer { lock.unlock() }
+        return _events
+    }
+
+    var summaries: [RunSummary] {
+        events.compactMap { if case .runFinished(let summary) = $0 { return summary } else { return nil } }
+    }
+
+    var bulkRequests: [BulkApprovalRequest] {
+        events.compactMap { if case .bulkApprovalRequested(let request) = $0 { return request } else { return nil } }
+    }
+
+    var applyRequests: [ApplyExistingRequest] {
+        events.compactMap { if case .applyExistingRequested(let request) = $0 { return request } else { return nil } }
+    }
+
+    var loops: [LoopAlert] {
+        events.compactMap { if case .loopDetected(let alert) = $0 { return alert } else { return nil } }
+    }
+}
+
+/// Polls `condition` until it holds or `timeout` passes.
+func eventually(timeout: TimeInterval = 5, _ condition: () async throws -> Bool) async rethrows -> Bool {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if try await condition() { return true }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+    }
+    return try await condition()
+}
+
+/// A clock tests can move.
+final class TestClock: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _now: Date
+
+    init(_ now: Date) { _now = now }
+
+    var now: Date {
+        lock.lock(); defer { lock.unlock() }
+        return _now
+    }
+
+    func set(_ date: Date) {
+        lock.lock(); _now = date; lock.unlock()
+    }
+
+    func advance(_ seconds: TimeInterval) {
+        lock.lock(); _now = _now.addingTimeInterval(seconds); lock.unlock()
     }
 }

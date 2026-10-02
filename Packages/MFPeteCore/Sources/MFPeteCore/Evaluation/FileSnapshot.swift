@@ -157,7 +157,7 @@ public struct FileSnapshot: Hashable, Sendable {
     }
 
     /// `SF_DATALESS` from `<sys/stat.h>`.
-    private static let datalessFlag: UInt32 = 0x4000_0000
+    static let datalessFlag: UInt32 = 0x4000_0000
 
     static func isDataless(_ url: URL) -> Bool {
         var info = stat()

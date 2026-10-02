@@ -1,4 +1,5 @@
 import AppKit
+import MFPeteCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     let appState = AppState()
@@ -14,6 +15,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.appState.openWindow(WindowID.rules)
         }
         appState.pruneActivityLog()
+        appState.startEngine()
+        observeWorkspace()
+    }
+
+    /// Lets the engine finish pending events and save its watcher position.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let appState = appState
+        Task {
+            await appState.stopEngine()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
+    /// Wake runs missed schedules; mounts and unmounts pause or resume rules
+    /// on external volumes (spec §11).
+    private func observeWorkspace() {
+        let center = NSWorkspace.shared.notificationCenter
+        let triggers = appState.triggers
+        center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { _ in
+            Task { await triggers.handleWake() }
+        }
+        center.addObserver(forName: NSWorkspace.didMountNotification, object: nil, queue: .main) { note in
+            guard let url = note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL else { return }
+            Task { await triggers.handleVolumeMounted(url) }
+        }
+        center.addObserver(forName: NSWorkspace.didUnmountNotification, object: nil, queue: .main) { note in
+            guard let url = note.userInfo?[NSWorkspace.volumeURLUserInfoKey] as? URL else { return }
+            Task { await triggers.handleVolumeUnmounted(url) }
+        }
     }
 
     /// Menu bar app: closing the last window keeps it running (spec §11).

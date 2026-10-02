@@ -8,17 +8,33 @@ public actor RuleEngine {
         public var maxConcurrentFiles: Int
         /// How long the engine remembers its own output (spec §5.4).
         public var selfChangeTTL: TimeInterval
+        /// Runs that would act on more files than this ask first (spec §5.6).
+        public var bulkThreshold: Int
+        /// Rule runs one file may go through within `loopWindow` (spec §5.6).
+        public var loopLimit: Int
+        public var loopWindow: TimeInterval
 
-        public init(maxConcurrentFiles: Int = 4, selfChangeTTL: TimeInterval = 10) {
+        public static let defaultBulkThreshold = 50
+
+        public init(
+            maxConcurrentFiles: Int = 4,
+            selfChangeTTL: TimeInterval = 10,
+            bulkThreshold: Int = Configuration.defaultBulkThreshold,
+            loopLimit: Int = 10,
+            loopWindow: TimeInterval = 60
+        ) {
             self.maxConcurrentFiles = maxConcurrentFiles
             self.selfChangeTTL = selfChangeTTL
+            self.bulkThreshold = bulkThreshold
+            self.loopLimit = loopLimit
+            self.loopWindow = loopWindow
         }
     }
 
     private let activityStore: ActivityStore
     let processedStore: ProcessedStore
     let environment: ActionEnvironment
-    private let configuration: Configuration
+    private var configuration: Configuration
     let executor: ActionExecutor
     let evaluator: ConditionEvaluator
 
@@ -28,6 +44,14 @@ public actor RuleEngine {
     private var running: Set<UUID> = []
     private var statuses: [UUID: RuleStatus] = [:]
     private var selfChanges: SelfChangeTracker
+    var loopGuard: LoopGuard
+    /// Bulk runs waiting for the user. `candidates` is nil for full scans.
+    private var pendingBulk: [UUID: (request: BulkApprovalRequest, candidates: [URL]?)] = [:]
+
+    /// Events for the UI: automatic run summaries, bulk and apply-to-existing
+    /// prompts, loop alerts. One consumer (the app's engine controller).
+    public nonisolated let events: AsyncStream<EngineEvent>
+    private nonisolated let eventContinuation: AsyncStream<EngineEvent>.Continuation
 
     public init(
         activityStore: ActivityStore,
@@ -42,6 +66,16 @@ public actor RuleEngine {
         self.executor = ActionExecutor(environment: environment)
         self.evaluator = ConditionEvaluator(calendar: environment.calendar)
         self.selfChanges = SelfChangeTracker(ttl: configuration.selfChangeTTL)
+        self.loopGuard = LoopGuard(limit: configuration.loopLimit, window: configuration.loopWindow)
+        (events, eventContinuation) = AsyncStream.makeStream(bufferingPolicy: .unbounded)
+    }
+
+    deinit {
+        eventContinuation.finish()
+    }
+
+    nonisolated func emit(_ event: EngineEvent) {
+        eventContinuation.yield(event)
     }
 
     // MARK: - State
@@ -70,6 +104,17 @@ public actor RuleEngine {
         statuses[ruleID] = nil
     }
 
+    func setStatus(_ status: RuleStatus?, of ruleID: UUID) {
+        statuses[ruleID] = status
+    }
+
+    /// Settings › Advanced › bulk guard threshold (spec §5.6).
+    public func setBulkThreshold(_ threshold: Int) {
+        configuration.bulkThreshold = max(1, threshold)
+    }
+
+    public var bulkThreshold: Int { configuration.bulkThreshold }
+
     /// The rule that just created or changed the item at `url`, if any (spec §5.4).
     public func selfChangeProducer(of url: URL) -> UUID? {
         selfChanges.producer(of: url, now: environment.now())
@@ -84,14 +129,27 @@ public actor RuleEngine {
         if rule.trigger == .fileRemoved { return .notAvailableForFileRemoved }
         if rule.containsUnknownElements { return .unsupportedElements }
         if running.contains(ruleID) { return .alreadyRunning }
-        return .completed(await scanAndRun(rule, reason: .manual))
+        let summary = await scanAndRun(rule, reason: .manual)
+        if let request = summary.pendingApproval { return .needsApproval(request) }
+        return .completed(summary)
     }
 
-    /// Full scan of the rule's scope folders. Used by Run Now and, from
-    /// Phase 3, by scheduled runs and apply-to-existing.
-    public func scanAndRun(_ rule: Rule, reason: RunTrigger) async -> RunSummary {
+    /// Full scan of the rule's scope folders. Used by Run Now, scheduled
+    /// runs, apply-to-existing, and the FSEvents fallback scan. `note` is
+    /// stored as detail on every activity entry ("Ran late (missed 09:00)").
+    /// The bulk guard applies unless bypassed or applying to existing files.
+    public func scanAndRun(
+        _ rule: Rule,
+        reason: RunTrigger,
+        note: String? = nil,
+        bypassBulkGuard: Bool = false
+    ) async -> RunSummary {
         let startedAt = environment.now()
         guard reason == .manual || (rule.isEnabled && !isPaused) else {
+            return RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
+        }
+        guard !running.contains(rule.id) || reason == .manual else {
+            // An automatic full scan while the rule already runs adds nothing.
             return RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
         }
         running.insert(rule.id)
@@ -102,10 +160,19 @@ public actor RuleEngine {
         scoped.scope = healthy
         let candidates = healthy.flatMap { FolderScanner.candidates(in: $0, options: rule.options) }
 
-        let (summaries, seenKeys) = await process(rules: [scoped], candidates: candidates, reason: reason)
+        if !bypassBulkGuard, reason != .applyExisting,
+           let request = await bulkRequest(for: scoped, candidates: candidates, reason: reason, keepCandidates: false) {
+            var summary = RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
+            summary.pendingApproval = request
+            summary.ruleErrors = errorSummary
+            return summary
+        }
+
+        let (summaries, seenKeys) = await process(rules: [scoped], candidates: candidates, reason: reason, note: note)
         var summary = summaries[rule.id] ?? RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
         summary.startedAt = startedAt
         summary.ruleErrors = errorSummary
+        summary.note = note
 
         // Forget files that are gone, but only when every folder was scanned.
         if healthy.count == rule.scope.count,
@@ -132,9 +199,9 @@ public actor RuleEngine {
         return summary
     }
 
-    /// Runs one rule on the given files (file events, Phase 3).
-    public func run(rule: Rule, candidates: [URL], reason: RunTrigger) async -> RunSummary {
-        let summaries = await run(rules: [rule], candidates: candidates, reason: reason)
+    /// Runs one rule on the given files.
+    public func run(rule: Rule, candidates: [URL], reason: RunTrigger, bypassBulkGuard: Bool = false) async -> RunSummary {
+        let summaries = await run(rules: [rule], candidates: candidates, reason: reason, bypassBulkGuard: bypassBulkGuard)
         return summaries.first ?? RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: environment.now())
     }
 
@@ -142,8 +209,23 @@ public actor RuleEngine {
     /// moves or trashes a file, later rules skip it. "Stop processing other
     /// rules" ends the chain for files that rule matched. Disabled rules and
     /// all automatic runs while paused are skipped. Returns one summary per
-    /// rule that ran, in order.
-    public func run(rules: [Rule], candidates: [URL], reason: RunTrigger) async -> [RunSummary] {
+    /// rule that ran, in order. A rule over the bulk threshold is held back
+    /// and its summary carries `pendingApproval`.
+    public func run(rules: [Rule], candidates: [URL], reason: RunTrigger, bypassBulkGuard: Bool = false) async -> [RunSummary] {
+        await run(rules: rules, candidates: candidates, reason: reason, bypassBulkGuard: bypassBulkGuard, suppressed: [:], chains: nil)
+    }
+
+    /// `suppressed` maps a candidate's canonical path to the rule that just
+    /// produced it; that rule skips it (spec §5.4). `chains` maps canonical
+    /// paths to loop-guard chain keys; pass it for file-event runs.
+    func run(
+        rules: [Rule],
+        candidates: [URL],
+        reason: RunTrigger,
+        bypassBulkGuard: Bool,
+        suppressed: [String: UUID],
+        chains: [String: String]?
+    ) async -> [RunSummary] {
         let startedAt = environment.now()
         if isPaused && reason != .manual { return [] }
         let eligible = rules
@@ -157,23 +239,92 @@ public actor RuleEngine {
 
         var scopedRules: [Rule] = []
         var ruleErrors: [UUID: [String]] = [:]
+        var held: [UUID: BulkApprovalRequest] = [:]
         for rule in eligible {
             let (healthy, errors) = await checkFolders(rule, reason: reason, startedAt: startedAt)
             var scoped = rule
             scoped.scope = healthy
-            scopedRules.append(scoped)
             ruleErrors[rule.id] = errors
+            if !bypassBulkGuard,
+               let request = await bulkRequest(for: scoped, candidates: candidates, reason: reason, keepCandidates: true) {
+                held[rule.id] = request
+                continue
+            }
+            scopedRules.append(scoped)
         }
 
-        let (summaries, _) = await process(rules: scopedRules, candidates: candidates, reason: reason)
+        var summaries: [UUID: RunSummary] = [:]
+        if !scopedRules.isEmpty {
+            (summaries, _) = await process(rules: scopedRules, candidates: candidates, reason: reason, suppressed: suppressed, chains: chains)
+        }
         let finishedAt = environment.now()
         return eligible.map { rule in
             var summary = summaries[rule.id] ?? RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
             summary.startedAt = startedAt
             summary.finishedAt = finishedAt
             summary.ruleErrors = ruleErrors[rule.id] ?? []
+            summary.pendingApproval = held[rule.id]
             return summary
         }
+    }
+
+    // MARK: - Bulk guard
+
+    /// Creates a bulk approval request if the rule would act on more files
+    /// than the threshold (spec §5.6). Automatic runs also emit it as an
+    /// event; manual runs return it to the caller.
+    private func bulkRequest(
+        for rule: Rule,
+        candidates: [URL],
+        reason: RunTrigger,
+        keepCandidates: Bool
+    ) async -> BulkApprovalRequest? {
+        let threshold = configuration.bulkThreshold
+        let covered = candidates.filter { FolderScanner.rule(rule, covers: $0) }
+        guard covered.count > threshold else { return nil }
+        let count = await actionableCount(rule, candidates: covered)
+        guard count > threshold else { return nil }
+        let request = BulkApprovalRequest(ruleID: rule.id, ruleName: rule.name, fileCount: count, trigger: reason)
+        pendingBulk[request.id] = (request, keepCandidates ? covered : nil)
+        if reason != .manual { emit(.bulkApprovalRequested(request)) }
+        return request
+    }
+
+    /// Files among `candidates` the rule would act on now: covered, not
+    /// ignored, matching, and not already processed.
+    func actionableCount(_ rule: Rule, candidates: [URL]) async -> Int {
+        let now = environment.now()
+        let filter = IgnoreFilter(includeHidden: rule.options.includeHidden)
+        var count = 0
+        for url in candidates where FolderScanner.rule(rule, covers: url) && !filter.isIgnored(url) {
+            guard let snapshot = try? FileSnapshot(reading: url),
+                  evaluator.matches(rule.conditions, snapshot: snapshot, now: now)
+            else { continue }
+            let processed = (try? await processedStore.isProcessed(
+                ruleID: rule.id, fileKey: snapshot.fileKey, modifiedAt: snapshot.dateModified ?? .distantPast
+            )) ?? false
+            if !processed { count += 1 }
+        }
+        return count
+    }
+
+    public var pendingBulkRequests: [BulkApprovalRequest] {
+        pendingBulk.values.map(\.request)
+    }
+
+    /// Answers a bulk prompt. Run returns the summary of the run, which
+    /// skips the guard; Cancel drops the request and returns nil.
+    public func resolveBulkApproval(_ requestID: UUID, approve: Bool) async -> RunSummary? {
+        guard let pending = pendingBulk.removeValue(forKey: requestID), approve,
+              let rule = rules.first(where: { $0.id == pending.request.ruleID })
+        else { return nil }
+        let summary: RunSummary
+        if let candidates = pending.candidates {
+            summary = await run(rule: rule, candidates: candidates, reason: pending.request.trigger, bypassBulkGuard: true)
+        } else {
+            summary = await scanAndRun(rule, reason: pending.request.trigger, bypassBulkGuard: true)
+        }
+        return summary
     }
 
     // MARK: - Pipeline
@@ -185,10 +336,14 @@ public actor RuleEngine {
         var healthy: [FolderRef] = []
         var errors: [String] = []
         var newStatus: RuleStatus?
+        var unavailable: String?
         for folder in rule.scope {
             switch FolderHealth.check(folder) {
             case .ok:
                 healthy.append(folder)
+            case .unavailable:
+                // Unmounted volume: skip quietly, no log entry (spec §11).
+                unavailable = unavailable ?? folder.tildeAbbreviated()
             case .missing:
                 let path = folder.tildeAbbreviated()
                 errors.append(localized("Folder missing: \(path)"))
@@ -215,17 +370,27 @@ public actor RuleEngine {
                     )
                 })
             }
-        } else if case .folderMissing = statuses[rule.id] {
-            statuses[rule.id] = nil
-        } else if case .noPermission = statuses[rule.id] {
-            statuses[rule.id] = nil
+        } else if let unavailable {
+            statuses[rule.id] = .folderUnavailable(unavailable)
+        } else if let status = statuses[rule.id] {
+            switch status {
+            case .folderMissing, .noPermission, .folderUnavailable: statuses[rule.id] = nil
+            case .ok, .error: break
+            }
         }
         return (healthy, errors)
     }
 
     /// Processes candidates with up to `maxConcurrentFiles` files at a time.
     /// Returns summaries by rule ID and the file keys of every candidate seen.
-    private func process(rules: [Rule], candidates: [URL], reason: RunTrigger) async -> ([UUID: RunSummary], Set<String>) {
+    private func process(
+        rules: [Rule],
+        candidates: [URL],
+        reason: RunTrigger,
+        note: String? = nil,
+        suppressed: [String: UUID] = [:],
+        chains: [String: String]? = nil
+    ) async -> ([UUID: RunSummary], Set<String>) {
         let startedAt = environment.now()
         var summaries: [UUID: RunSummary] = [:]
         var verbs: [UUID: [String]] = [:]
@@ -236,13 +401,15 @@ public actor RuleEngine {
         var records: [ActivityRecord] = []
         var failures: [UUID: String] = [:]
         var permissionDenied: [UUID: String] = [:]
+        var loops: [LoopAlert] = []
 
         let context = FileContext(
             executor: executor,
             evaluator: evaluator,
             processedStore: processedStore,
             now: environment.now,
-            reason: reason
+            reason: reason,
+            suppressed: suppressed
         )
         let limit = max(1, configuration.maxConcurrentFiles)
 
@@ -262,6 +429,16 @@ public actor RuleEngine {
                 for (ruleID, url) in work.produced {
                     selfChanges.record(url, ruleID: ruleID, now: now)
                 }
+                if let chains, let chain = chains[FolderScanner.canonicalPath(work.source)] {
+                    for (_, url) in work.produced {
+                        loopGuard.noteProduced(url, chain: chain, now: now)
+                    }
+                    let acted = rules.map(\.id).filter { work.results[$0]?.kind == .actedOn }
+                    if let involved = loopGuard.record(chain, ruleIDs: acted, now: now) {
+                        let names = involved.compactMap { id in rules.first { $0.id == id }?.name }
+                        loops.append(LoopAlert(ruleIDs: involved, ruleNames: names, filePath: work.source.path))
+                    }
+                }
                 if let key = work.fileKey { seenKeys.insert(key) }
                 records += work.records
                 failures.merge(work.failures) { first, _ in first }
@@ -273,7 +450,23 @@ public actor RuleEngine {
             }
         }
 
+        if let note {
+            for index in records.indices { records[index].detail = note }
+        }
+        for alert in loops {
+            records.append(ActivityRecord(
+                timestamp: environment.now(),
+                ruleID: alert.ruleIDs.first ?? rules.first?.id ?? UUID(),
+                ruleName: alert.ruleNames.first ?? "",
+                action: localized("Loop guard"),
+                sourcePath: alert.filePath,
+                result: .failed,
+                message: alert.message,
+                runTrigger: reason
+            ))
+        }
         await log(records)
+        loops.forEach { emit(.loopDetected($0)) }
 
         for rule in rules {
             summaries[rule.id]?.dominantVerb = RuleEngine.dominantVerb(verbs[rule.id] ?? [])
@@ -289,7 +482,7 @@ public actor RuleEngine {
         return (summaries, seenKeys)
     }
 
-    private func log(_ records: [ActivityRecord]) async {
+    func log(_ records: [ActivityRecord]) async {
         guard !records.isEmpty else { return }
         try? await activityStore.add(records)
     }
@@ -307,13 +500,18 @@ public actor RuleEngine {
         var processedStore: ProcessedStore
         var now: @Sendable () -> Date
         var reason: RunTrigger
+        /// Canonical candidate path → rule that produced it (spec §5.4).
+        var suppressed: [String: UUID] = [:]
     }
 
     /// Runs every applicable rule on one file, serially, in order.
     static func processFile(_ url: URL, rules: [Rule], context: FileContext) async -> FileWork {
-        var work = FileWork()
+        var work = FileWork(source: url)
         var current = url
+        let producer = context.suppressed.isEmpty ? nil : context.suppressed[FolderScanner.canonicalPath(url)]
         for rule in rules {
+            // A rule never re-triggers on its own output; other rules do.
+            if rule.id == producer, current == url { continue }
             guard FolderScanner.rule(rule, covers: current) else { continue }
             if IgnoreFilter(includeHidden: rule.options.includeHidden).isIgnored(current) { continue }
             // The file may have vanished since it was listed. Nothing to do.
@@ -396,6 +594,7 @@ public actor RuleEngine {
     }
 
     struct FileWork: Sendable {
+        var source: URL
         var fileKey: String?
         var results: [UUID: FileResult] = [:]
         var records: [ActivityRecord] = []

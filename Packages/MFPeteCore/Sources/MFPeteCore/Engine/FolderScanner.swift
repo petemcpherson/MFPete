@@ -5,12 +5,17 @@ public enum FolderHealth: Hashable, Sendable {
     case ok
     case missing
     case noPermission
+    /// On an external volume that is not mounted right now.
+    case unavailable
 
     /// Checks that the folder exists, is a directory, and can be listed.
     /// Listing is the real test: TCC denies `opendir`, not `stat`.
     public static func check(_ folder: FolderRef) -> FolderHealth {
         var isDirectory: ObjCBool = false
         guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory), isDirectory.boolValue else {
+            if let volume = volumeRoot(of: folder.path), !FileManager.default.fileExists(atPath: volume) {
+                return .unavailable
+            }
             return .missing
         }
         guard let directory = opendir(folder.path) else {
@@ -18,6 +23,13 @@ public enum FolderHealth: Hashable, Sendable {
         }
         closedir(directory)
         return .ok
+    }
+
+    /// `/Volumes/<name>` for paths on an external volume, else nil.
+    public static func volumeRoot(of path: String) -> String? {
+        let parts = (path as NSString).standardizingPath.split(separator: "/", omittingEmptySubsequences: true)
+        guard parts.count >= 2, parts[0] == "Volumes" else { return nil }
+        return "/Volumes/\(parts[1])"
     }
 }
 

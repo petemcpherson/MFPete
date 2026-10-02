@@ -45,6 +45,10 @@ public struct RunSummary: Hashable, Sendable {
     /// Past-tense verb of the most common successful action, for
     /// notification text ("moved to Trash").
     public var dominantVerb: String?
+    /// Set when the bulk guard held the run back (spec §5.6). Nothing ran.
+    public var pendingApproval: BulkApprovalRequest?
+    /// Extra context, such as "Ran late (missed 09:00)" (spec §3.2).
+    public var note: String?
 
     public init(ruleID: UUID, ruleName: String, trigger: RunTrigger, startedAt: Date) {
         self.ruleID = ruleID
@@ -70,6 +74,9 @@ public enum RunNowResult: Hashable, Sendable {
     case notAvailableForFileRemoved
     /// The rule has actions or conditions from a newer app version.
     case unsupportedElements
+    /// The run would act on more files than the bulk guard allows. Nothing
+    /// ran. Answer with `RuleEngine.resolveBulkApproval(_:approve:)`.
+    case needsApproval(BulkApprovalRequest)
 }
 
 /// Health of a rule as the engine last saw it (spec §10, §13).
@@ -77,10 +84,18 @@ public enum RuleStatus: Hashable, Sendable {
     case ok
     case folderMissing(String)
     case noPermission(String)
+    /// The folder is on a volume that is not mounted. Not an error: the rule
+    /// resumes when the volume comes back (spec §11).
+    case folderUnavailable(String)
     /// The last run had a failed action.
     case error(String)
 
-    public var isError: Bool { self != .ok }
+    public var isError: Bool {
+        switch self {
+        case .ok, .folderUnavailable: return false
+        case .folderMissing, .noPermission, .error: return true
+        }
+    }
 }
 
 /// Dry run of a rule (for Preview): what would happen to each matching file.
@@ -119,6 +134,15 @@ extension Action {
         case .open: return localized("opened")
         case .revealInFinder: return localized("revealed in Finder")
         case .notify, .unknown: return localized("processed")
+        }
+    }
+
+    /// True if the action reads the file's contents, so an online-only
+    /// placeholder must be downloaded first (spec §12).
+    var needsContents: Bool {
+        switch self {
+        case .copy, .unarchive: return true
+        default: return false
         }
     }
 

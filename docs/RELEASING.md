@@ -127,6 +127,7 @@ submitted to `homebrew/cask` and `Casks/` deleted from this repo.
 | Version | Build | Date | Notes |
 | --- | --- | --- | --- |
 | 1.0.0 | 12 | 2026-10-12 | First public release. Local build, Homebrew tap. Sparkle off. |
+| 1.1.0 | 15 | 2026-10-12 | Scheduled Empty Trash action and template. Menu bar Empty Trash removed. Sparkle off. |
 
 ## Release checklist
 

@@ -1,6 +1,6 @@
 cask "mfpete" do
-  version "1.0.0"
-  sha256 "88a81881e1c0edf82c340c1574441a15ea2e6a31dda5c78522d30d96694e63a1"
+  version "1.1.0"
+  sha256 "565946bd936f69d8a6a178dbae99a92f4fe2ef2c1377da24f3913a4e2aebabed"
 
   url "https://github.com/petemcpherson/MFPete/releases/download/v#{version}/MFPete-#{version}.dmg"
   name "MFPete"

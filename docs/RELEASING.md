@@ -126,6 +126,7 @@ submitted to `homebrew/cask` and `Casks/` deleted from this repo.
 
 | Version | Build | Date | Notes |
 | --- | --- | --- | --- |
+| 1.0.0 | 12 | 2026-10-12 | First public release. Local build, Homebrew tap. Sparkle off. |
 
 ## Release checklist
 

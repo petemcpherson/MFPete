@@ -12,7 +12,8 @@ cask "mfpete" do
     strategy :github_latest
   end
 
-  auto_updates true
+  # Add `auto_updates true` once Sparkle is live (SUPublicEDKey set in Config/Info.plist).
+  # Until then, `brew upgrade` is the update path.
   depends_on macos: ">= :sonoma"
 
   app "MFPete.app"

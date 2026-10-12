@@ -34,11 +34,14 @@ A small, free, open-source macOS menu bar app that tidies your files with simple
 
 Requires macOS 14 (Sonoma) or later.
 
-**Homebrew** (once the cask is published):
+**Homebrew:**
 
 ```sh
-brew install --cask mfpete
+brew tap petemcpherson/mfpete https://github.com/petemcpherson/MFPete
+brew install --cask petemcpherson/mfpete/mfpete
 ```
+
+Update later with `brew upgrade`.
 
 **Direct download:** get the latest `MFPete-<version>.dmg` from
 [GitHub Releases](https://github.com/petemcpherson/MFPete/releases/latest), open it, and

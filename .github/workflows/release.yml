@@ -18,7 +18,21 @@ permissions:
   contents: write
 
 jobs:
+  # Releases are cut locally (docs/RELEASING.md) until the secrets above exist.
+  # Without them, this skips instead of failing.
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
+    steps:
+      - id: secrets
+        env:
+          P12: ${{ secrets.DEVELOPER_ID_P12 }}
+        run: echo "ready=$([ -n "$P12" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
   release:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4

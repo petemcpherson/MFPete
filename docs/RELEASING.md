@@ -66,25 +66,66 @@ Sparkle uses it to decide whether an update is newer.
 
 ### Local release (without CI)
 
+Until the CI secrets exist, the Release workflow skips and releases are cut
+locally. Any notary profile for team `A2T9Q78M27` works (for example the
+`petekm-notary` profile).
+
 ```sh
-NOTARY_PROFILE=mfpete-notary MARKETING_VERSION=1.0.0 scripts/release.sh
-scripts/make-appcast.sh   # uses the private key in your login keychain
+V=1.0.1
+NOTARY_PROFILE=petekm-notary MARKETING_VERSION=$V scripts/release.sh
+spctl -a -t open --context context:primary-signature -v build/release/MFPete-$V.dmg   # "accepted"
+git tag v$V && git push origin v$V
+gh release create v$V build/release/MFPete-$V.dmg build/release/MFPete-$V.zip \
+  --title "MFPete $V" --notes "What changed."
 ```
 
-Upload `build/release/MFPete-<version>.dmg`, `MFPete-<version>.zip`, and
-`appcast.xml` to a GitHub Release named `v<version>`.
+Once Sparkle keys exist, also run `scripts/make-appcast.sh` (uses the private
+key in your login keychain) and upload `build/release/appcast.xml` to the same
+release.
+
+Then update the Homebrew cask (below).
 
 `SKIP_NOTARIZE=1 scripts/release.sh` makes a signed but not notarized build for
 local testing.
 
 ## Homebrew
 
-The cask draft lives in `packaging/homebrew/mfpete.rb`. After a release:
+The cask lives in this repo at `Casks/mfpete.rb`, so no separate tap repo is
+needed. Users install with:
 
-1. Set `version` and `sha256` (`shasum -a 256 build/release/MFPete-<version>.dmg`).
-2. Submit it to `homebrew/cask` once the project meets Homebrew's notability
-   requirements. Until then, publish it in a personal tap
-   (`petemcpherson/homebrew-tap`) or point users to the DMG.
+```sh
+brew tap petemcpherson/mfpete https://github.com/petemcpherson/MFPete
+brew install --cask petemcpherson/mfpete/mfpete
+```
+
+The fully qualified name matters: Homebrew refuses casks from untrusted
+third-party taps when installed by the bare token.
+
+After every release:
+
+1. `shasum -a 256 build/release/MFPete-<version>.dmg`
+2. Set `version` and `sha256` in `Casks/mfpete.rb`. Commit and push to `main`.
+   From then on, `brew upgrade` delivers the release.
+3. Verify:
+
+   ```sh
+   brew update && brew upgrade --cask mfpete      # upgrade path
+   brew audit --cask --strict petemcpherson/mfpete/mfpete
+   ```
+
+The tag must be `v<version>` and the asset must be `MFPete-<version>.dmg`, or the
+cask URL 404s.
+
+When Sparkle goes live (public key set), add `auto_updates true` to the cask so
+Homebrew leaves updates to Sparkle.
+
+Later, once the project meets Homebrew's notability bar, the cask can be
+submitted to `homebrew/cask` and `Casks/` deleted from this repo.
+
+## Release log
+
+| Version | Build | Date | Notes |
+| --- | --- | --- | --- |
 
 ## Release checklist
 

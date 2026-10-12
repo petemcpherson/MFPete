@@ -3,9 +3,9 @@ import Testing
 @testable import MFPeteCore
 
 struct RuleTemplateTests {
-    @Test func sixTemplatesWithUniqueIDs() {
-        #expect(RuleTemplate.all.count == 6)
-        #expect(Set(RuleTemplate.all.map(\.id)).count == 6)
+    @Test func sevenTemplatesWithUniqueIDs() {
+        #expect(RuleTemplate.all.count == 7)
+        #expect(Set(RuleTemplate.all.map(\.id)).count == 7)
         #expect(RuleTemplate.featured.count == 3)
     }
 

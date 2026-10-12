@@ -14,7 +14,9 @@ A small, free, open-source macOS menu bar app that tidies your files with simple
 - **Runs actions** in order: move, copy, rename with patterns like `{date-added} {name}`,
   change extension, sort into subfolders, add or remove tags, unzip, open, reveal in
   Finder, move to Trash, or show a notification.
-- **Stays safe:** files go to the Trash, never straight to deletion. A preview shows what
+- **Empties the Trash** on a schedule with an Empty Trash rule. This is the only action
+  that deletes permanently, and the rule editor shows a warning for it.
+- **Stays safe:** file actions move files to the Trash, never straight to deletion. A preview shows what
   a rule will do before it runs. Loop and bulk guards stop runaway rules, and every
   action is written to an activity log.
 - **Run Now** any rule from the dashboard or the menu bar.
@@ -29,6 +31,7 @@ A small, free, open-source macOS menu bar app that tidies your files with simple
 | Keep Desktop clean | Moves new Desktop items into a "Desktop Inbox" folder |
 | Sort by type | Sorts files into subfolders named after their extension |
 | Text to Markdown | Changes `.txt` files to `.md` and moves them to a folder you choose |
+| Empty Trash weekly | Every Monday at 9:00, permanently deletes everything in the Trash |
 
 ## Install
 
@@ -60,7 +63,8 @@ The **only** network traffic is the Sparkle update check, which downloads
 
 MFPete is not sandboxed, so it can work in any folder you choose. macOS still asks your
 permission the first time it touches Desktop, Documents, Downloads, iCloud Drive, or
-external volumes. Full Disk Access is not needed.
+external volumes. Full Disk Access is not needed. An Empty Trash rule asks Finder to
+empty the Trash, so the first run shows the Automation prompt for Finder.
 
 ## Build
 

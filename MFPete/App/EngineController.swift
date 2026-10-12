@@ -73,7 +73,11 @@ final class EngineController {
         engine = RuleEngine(
             activityStore: ActivityStore(modelContainer: modelContainer),
             processedStore: ProcessedStore(modelContainer: modelContainer),
-            environment: ActionEnvironment(workspace: AppWorkspaceService(), notifier: ActionNotificationPoster()),
+            environment: ActionEnvironment(
+                workspace: AppWorkspaceService(),
+                notifier: ActionNotificationPoster(),
+                emptyTrash: { try await TrashEmptier.empty() }
+            ),
             configuration: RuleEngine.Configuration(bulkThreshold: bulkThreshold)
         )
         triggers = TriggerCoordinator(

@@ -40,6 +40,7 @@ struct CodingTests {
         .open(withApp: URL(fileURLWithPath: "/Applications/Preview.app")),
         .revealInFinder,
         .notify(message: "Moved {fullname}"),
+        .emptyTrash,
     ]
 
     static let values: [ConditionValue] = [

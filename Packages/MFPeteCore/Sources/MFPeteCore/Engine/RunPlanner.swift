@@ -101,6 +101,9 @@ struct RunPlanner {
         case .addTags, .removeTags, .open, .revealInFinder, .notify:
             return (step(url), file)
 
+        case .emptyTrash:
+            return (step(nil, .willFail(ActionError.emptyTrashPerFile.errorDescription ?? "")), nil)
+
         case .unknown:
             return (step(nil, .willFail(localized("Unknown action"))), nil)
         }

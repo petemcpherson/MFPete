@@ -80,6 +80,7 @@ public enum ActionType: String, Hashable, Sendable, CaseIterable, Identifiable {
     case open
     case revealInFinder
     case notify
+    case emptyTrash
 
     public var id: String { rawValue }
 
@@ -97,6 +98,7 @@ public enum ActionType: String, Hashable, Sendable, CaseIterable, Identifiable {
         case .open: return localized("Open")
         case .revealInFinder: return localized("Reveal in Finder")
         case .notify: return localized("Show notification")
+        case .emptyTrash: return localized("Empty Trash")
         }
     }
 
@@ -122,6 +124,7 @@ public enum ActionType: String, Hashable, Sendable, CaseIterable, Identifiable {
         case .open: return .open(withApp: nil)
         case .revealInFinder: return .revealInFinder
         case .notify: return .notify(message: "{fullname}")
+        case .emptyTrash: return .emptyTrash
         }
     }
 }
@@ -142,6 +145,7 @@ extension Action {
         case .open: return .open
         case .revealInFinder: return .revealInFinder
         case .notify: return .notify
+        case .emptyTrash: return .emptyTrash
         case .unknown: return nil
         }
     }

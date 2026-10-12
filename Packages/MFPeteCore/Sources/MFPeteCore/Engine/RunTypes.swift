@@ -133,6 +133,7 @@ extension Action {
         case .unarchive: return localized("unarchived")
         case .open: return localized("opened")
         case .revealInFinder: return localized("revealed in Finder")
+        case .emptyTrash: return localized("deleted from Trash")
         case .notify, .unknown: return localized("processed")
         }
     }

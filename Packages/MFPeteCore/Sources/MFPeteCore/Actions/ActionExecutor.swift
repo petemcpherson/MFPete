@@ -47,6 +47,8 @@ enum ActionError: LocalizedError {
     case emptyName
     case unsupportedArchive
     case unarchiveFailed(String)
+    case emptyTrashUnavailable
+    case emptyTrashPerFile
 
     var errorDescription: String? {
         switch self {
@@ -54,6 +56,8 @@ enum ActionError: LocalizedError {
         case .emptyName: return localized("The name pattern produced an empty name")
         case .unsupportedArchive: return localized("Only .zip archives can be unarchived")
         case .unarchiveFailed(let reason): return localized("Could not unarchive: \(reason)")
+        case .emptyTrashUnavailable: return localized("Empty Trash is not available")
+        case .emptyTrashPerFile: return localized("Empty Trash runs once per rule, not on single files")
         }
     }
 }
@@ -157,6 +161,10 @@ public struct ActionExecutor: Sendable {
             let body = renderer.renderText(message, snapshot: snapshot, now: now)
             await environment.notifier.showActionNotification(title: rule.name, body: body, ruleID: rule.id)
             return .success(url)
+
+        case .emptyTrash:
+            // The engine runs Empty Trash rules itself (`RuleEngine.emptyTrash`).
+            throw ActionError.emptyTrashPerFile
 
         case .unknown:
             return ActionOutcome(result: .failed, currentURL: url, message: localized("Unknown action"))

@@ -155,6 +155,10 @@ public actor RuleEngine {
         running.insert(rule.id)
         defer { running.remove(rule.id) }
 
+        if rule.emptiesTrash {
+            return await emptyTrash(rule, reason: reason, note: note, startedAt: startedAt)
+        }
+
         let (healthy, errorSummary) = await checkFolders(rule, reason: reason, startedAt: startedAt)
         var scoped = rule
         scoped.scope = healthy
@@ -230,7 +234,7 @@ public actor RuleEngine {
         if isPaused && reason != .manual { return [] }
         let eligible = rules
             .filter { reason == .manual || $0.isEnabled }
-            .filter { !$0.containsUnknownElements && $0.trigger != .fileRemoved }
+            .filter { !$0.containsUnknownElements && $0.trigger != .fileRemoved && !$0.emptiesTrash }
             .sorted { $0.order < $1.order }
         guard !eligible.isEmpty else { return [] }
 
@@ -266,6 +270,49 @@ public actor RuleEngine {
             summary.pendingApproval = held[rule.id]
             return summary
         }
+    }
+
+    // MARK: - Empty Trash
+
+    /// Runs an Empty Trash rule: one call for the whole Trash, one activity
+    /// entry. Folders, conditions, processed records, and the bulk guard do
+    /// not apply.
+    private func emptyTrash(_ rule: Rule, reason: RunTrigger, note: String?, startedAt: Date) async -> RunSummary {
+        var summary = RunSummary(ruleID: rule.id, ruleName: rule.name, trigger: reason, startedAt: startedAt)
+        summary.note = note
+        let trashPath = FileManager.default.urls(for: .trashDirectory, in: .userDomainMask).first?.path ?? ""
+        var record = ActivityRecord(
+            timestamp: startedAt,
+            ruleID: rule.id,
+            ruleName: rule.name,
+            action: Action.emptyTrash.displayName,
+            sourcePath: trashPath,
+            result: .success,
+            detail: note ?? "",
+            runTrigger: reason
+        )
+        do {
+            let count = try await environment.emptyTrash()
+            summary.matched = count
+            summary.actedOn = count
+            summary.dominantVerb = Action.emptyTrash.pastTenseVerb
+            if count == 0 {
+                record.result = .skipped
+                record.message = localized("The Trash was already empty")
+            } else {
+                record.message = count == 1 ? localized("Deleted 1 item") : localized("Deleted \(count) items")
+            }
+            if case .error = statuses[rule.id] { statuses[rule.id] = nil }
+        } catch {
+            let message = error.localizedDescription
+            summary.ruleErrors = [message]
+            record.result = .failed
+            record.message = message
+            statuses[rule.id] = .error(message)
+        }
+        summary.finishedAt = environment.now()
+        await log([record])
+        return summary
     }
 
     // MARK: - Bulk guard

@@ -95,6 +95,11 @@ public struct Rule: Identifiable, Codable, Hashable, Sendable {
         actions.contains(where: \.isUnknown) || conditions.containsUnknown
     }
 
+    /// The rule empties the Trash instead of acting on files in folders.
+    public var emptiesTrash: Bool {
+        actions.contains(.emptyTrash)
+    }
+
     /// Auto-generated name, "Downloads: Move to Trash" (spec §7).
     public static func autoName(scope: [FolderRef], actions: [Action]) -> String {
         let folder = scope.first?.displayName

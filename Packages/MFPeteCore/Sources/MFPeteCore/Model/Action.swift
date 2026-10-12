@@ -26,6 +26,9 @@ public enum Action: Codable, Hashable, Sendable {
     case open(withApp: URL?)
     case revealInFinder
     case notify(message: String)
+    /// Empties the whole Trash once per run. Not a per-file action: a rule
+    /// with it has no folders or conditions and runs on a schedule.
+    case emptyTrash
     /// An action from a newer app version. Kept as raw JSON; the containing
     /// rule loads disabled.
     case unknown(JSONValue)
@@ -50,13 +53,14 @@ public enum Action: Codable, Hashable, Sendable {
         case .open: return localized("Open")
         case .revealInFinder: return localized("Reveal in Finder")
         case .notify: return localized("Show notification")
+        case .emptyTrash: return localized("Empty Trash")
         case .unknown: return localized("Unknown action")
         }
     }
 
     private enum Kind: String {
         case move, copy, rename, changeExtension, trash, sortIntoSubfolder
-        case addTags, removeTags, unarchive, open, revealInFinder, notify
+        case addTags, removeTags, unarchive, open, revealInFinder, notify, emptyTrash
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -116,6 +120,8 @@ public enum Action: Codable, Hashable, Sendable {
             return .revealInFinder
         case .notify:
             return .notify(message: try container.decode(String.self, forKey: .message))
+        case .emptyTrash:
+            return .emptyTrash
         }
     }
 
@@ -165,6 +171,8 @@ public enum Action: Codable, Hashable, Sendable {
         case .notify(let message):
             try container.encode(Kind.notify.rawValue, forKey: .type)
             try container.encode(message, forKey: .message)
+        case .emptyTrash:
+            try container.encode(Kind.emptyTrash.rawValue, forKey: .type)
         case .unknown:
             break
         }

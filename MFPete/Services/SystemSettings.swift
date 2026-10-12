@@ -46,10 +46,6 @@ enum SystemSettingsLink {
         open("x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")
     }
 
-    static func openAutomation() {
-        open("x-apple.systempreferences:com.apple.preference.security?Privacy_Automation")
-    }
-
     static func openNotifications() {
         open("x-apple.systempreferences:com.apple.Notifications-Settings.extension")
     }

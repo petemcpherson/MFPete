@@ -36,6 +36,9 @@ public struct ActionEnvironment: Sendable {
     public var notifier: any NotificationService
     /// Moves an item to the Trash and returns where it ended up.
     public var trash: @Sendable (URL) throws -> URL?
+    /// Empties the whole Trash and returns how many items it held. The app
+    /// target asks Finder; the default throws.
+    public var emptyTrash: @Sendable () async throws -> Int
     public var calendar: Calendar
     public var now: @Sendable () -> Date
 
@@ -43,14 +46,21 @@ public struct ActionEnvironment: Sendable {
         workspace: any WorkspaceService = NoopWorkspaceService(),
         notifier: any NotificationService = NoopNotificationService(),
         trash: @escaping @Sendable (URL) throws -> URL? = ActionEnvironment.systemTrash,
+        emptyTrash: @escaping @Sendable () async throws -> Int = ActionEnvironment.emptyTrashUnavailable,
         calendar: Calendar = .current,
         now: @escaping @Sendable () -> Date = { Date() }
     ) {
         self.workspace = workspace
         self.notifier = notifier
         self.trash = trash
+        self.emptyTrash = emptyTrash
         self.calendar = calendar
         self.now = now
+    }
+
+    /// Default for headless use: Empty Trash rules fail with a clear message.
+    public static let emptyTrashUnavailable: @Sendable () async throws -> Int = {
+        throw ActionError.emptyTrashUnavailable
     }
 
     /// `FileManager.trashItem`, so Finder's "Put Back" works.

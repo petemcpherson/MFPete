@@ -12,34 +12,45 @@ struct WhenCard: View {
         EditorCard(title: "WHEN") {
             HStack(spacing: 8) {
                 Picker("Trigger", selection: triggerType) {
-                    ForEach(TriggerType.allCases) { type in
+                    ForEach(triggerTypes) { type in
                         Text(type.displayName).tag(type)
                     }
                 }
                 .labelsHidden()
                 .fixedSize()
                 .accessibilityIdentifier("triggerPicker")
-                Text(rule.trigger.isFileEvent ? "in" : "scan")
-                    .foregroundStyle(.secondary)
+                if !rule.emptiesTrash {
+                    Text(rule.trigger.isFileEvent ? "in" : "scan")
+                        .foregroundStyle(.secondary)
+                }
                 Spacer()
             }
             ScheduleControls(trigger: $rule.trigger)
 
-            folders
+            // Empty Trash acts on the whole Trash, so there are no folders.
+            if !rule.emptiesTrash {
+                folders
 
-            DisclosureGroup("Options", isExpanded: $showsOptions) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Toggle("Include subfolders", isOn: $rule.options.includeSubfolders)
-                    Toggle("Include hidden files", isOn: $rule.options.includeHidden)
+                DisclosureGroup("Options", isExpanded: $showsOptions) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Toggle("Include subfolders", isOn: $rule.options.includeSubfolders)
+                        Toggle("Include hidden files", isOn: $rule.options.includeHidden)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, 4)
+                .font(.callout)
             }
-            .font(.callout)
         }
         .onAppear {
             showsOptions = rule.options.includeSubfolders || rule.options.includeHidden
         }
+    }
+
+    /// Empty Trash rules run only on a schedule.
+    private var triggerTypes: [TriggerType] {
+        guard rule.emptiesTrash else { return TriggerType.allCases }
+        return TriggerType.allCases.filter { $0.makeTrigger(from: rule.trigger).isSchedule }
     }
 
     private var triggerType: Binding<TriggerType> {

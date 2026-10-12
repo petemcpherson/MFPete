@@ -146,9 +146,6 @@
     "All Folders" : {
 
     },
-    "All items in the Trash will be deleted permanently. You can’t undo this action." : {
-
-    },
     "All Rules" : {
 
     },
@@ -264,7 +261,7 @@
     "Copy Path" : {
 
     },
-    "Could not empty the Trash" : {
+    "Could not empty the Trash: %@" : {
 
     },
     "Could not import rules" : {
@@ -352,15 +349,6 @@
 
     },
     "Edit…" : {
-
-    },
-    "Empty the Trash?" : {
-
-    },
-    "Empty Trash" : {
-
-    },
-    "Empty Trash…" : {
 
     },
     "Enable %@" : {
@@ -757,9 +745,6 @@
     "Open Rules…" : {
 
     },
-    "Open System Settings" : {
-
-    },
     "Opens Privacy & Security settings" : {
 
     },
@@ -773,6 +758,9 @@
 
     },
     "pdf" : {
+
+    },
+    "Permanently deletes everything in the Trash. The first run asks for permission to control Finder." : {
 
     },
     "Pick at least one day." : {

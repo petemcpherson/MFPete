@@ -1,43 +1,58 @@
-import AppKit
+import Foundation
 
-/// Menu bar › Empty Trash. Asks Finder to empty the Trash through Apple
-/// Events, so the first use shows the system Automation prompt.
+/// The Empty Trash action. Asks Finder to empty the Trash through Apple
+/// Events, so the first run shows the system Automation prompt.
 enum TrashEmptier {
     /// `errAEEventNotPermitted`: the user denied Automation access to Finder.
     private static let notPermitted = -1743
 
-    @MainActor
-    static func confirmAndEmpty() {
-        AppActivation.bringToFront()
+    /// Turns off Finder's "warn before emptying" dialog for this one call,
+    /// so a scheduled run never waits on a dialog. Returns the item count.
+    private static let source = """
+        tell application "Finder"
+            set itemCount to count items of trash
+            if itemCount > 0 then
+                set shouldWarn to warns before emptying of trash
+                set warns before emptying of trash to false
+                try
+                    empty trash
+                on error message number code
+                    set warns before emptying of trash to shouldWarn
+                    error message number code
+                end try
+                set warns before emptying of trash to shouldWarn
+            end if
+            return itemCount
+        end tell
+        """
 
-        let confirm = NSAlert()
-        confirm.alertStyle = .warning
-        confirm.messageText = String(localized: "Empty the Trash?")
-        confirm.informativeText = String(localized: "All items in the Trash will be deleted permanently. You can’t undo this action.")
-        confirm.addButton(withTitle: String(localized: "Empty Trash"))
-        confirm.addButton(withTitle: String(localized: "Cancel"))
-        guard confirm.runModal() == .alertFirstButtonReturn else { return }
+    enum Failure: LocalizedError {
+        case notPermitted
+        case finder(String)
 
-        var errorInfo: NSDictionary?
-        let script = NSAppleScript(source: "tell application \"Finder\" to empty trash")
-        script?.executeAndReturnError(&errorInfo)
-        guard let errorInfo else { return }
-
-        let code = errorInfo[NSAppleScript.errorNumber] as? Int
-        let alert = NSAlert()
-        alert.alertStyle = .warning
-        alert.messageText = String(localized: "Could not empty the Trash")
-        if code == notPermitted {
-            alert.informativeText = String(localized: "MFPete needs permission to control Finder. Turn on Finder for MFPete in System Settings › Privacy & Security › Automation.")
-            alert.addButton(withTitle: String(localized: "Open System Settings"))
-            alert.addButton(withTitle: String(localized: "Cancel"))
-            if alert.runModal() == .alertFirstButtonReturn {
-                SystemSettingsLink.openAutomation()
+        var errorDescription: String? {
+            switch self {
+            case .notPermitted:
+                return String(localized: "MFPete needs permission to control Finder. Turn on Finder for MFPete in System Settings › Privacy & Security › Automation.")
+            case .finder(let message):
+                return String(localized: "Could not empty the Trash: \(message)")
             }
-        } else {
-            alert.informativeText = errorInfo[NSAppleScript.errorMessage] as? String
-                ?? String(localized: "Finder returned an unknown error.")
-            alert.runModal()
         }
+    }
+
+    /// Empties the Trash and returns how many items it held.
+    /// `NSAppleScript` is not thread-safe, so it runs on the main actor.
+    @MainActor
+    static func empty() throws -> Int {
+        var errorInfo: NSDictionary?
+        let result = NSAppleScript(source: source)?.executeAndReturnError(&errorInfo)
+        if let errorInfo {
+            if errorInfo[NSAppleScript.errorNumber] as? Int == notPermitted {
+                throw Failure.notPermitted
+            }
+            throw Failure.finder(errorInfo[NSAppleScript.errorMessage] as? String
+                ?? String(localized: "Finder returned an unknown error."))
+        }
+        return Int(result?.int32Value ?? 0)
     }
 }

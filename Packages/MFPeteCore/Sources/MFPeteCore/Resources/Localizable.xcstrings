@@ -4,6 +4,12 @@
     "“%@” cannot run when a file is removed. Use Show notification." : {
 
     },
+    "“Empty Trash” cannot be combined with other actions." : {
+
+    },
+    "“Empty Trash” runs on a schedule. Choose how often to run it." : {
+
+    },
     "%@ (and %lld more)" : {
       "localizations" : {
         "en" : {
@@ -200,6 +206,15 @@
     "days" : {
 
     },
+    "Deleted %lld items" : {
+
+    },
+    "Deleted 1 item" : {
+
+    },
+    "deleted from Trash" : {
+
+    },
     "Desktop" : {
 
     },
@@ -233,6 +248,21 @@
     "Downloads" : {
 
     },
+    "empty the Trash" : {
+
+    },
+    "Empty Trash" : {
+
+    },
+    "Empty Trash is not available" : {
+
+    },
+    "Empty Trash runs once per rule, not on single files" : {
+
+    },
+    "Empty Trash weekly" : {
+
+    },
     "ends with" : {
 
     },
@@ -257,22 +287,22 @@
     "Errors only" : {
 
     },
-    "Every %@ at %@, %@" : {
+    "Every %@ at %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Every %1$@ at %2$@, %3$@"
+            "value" : "Every %1$@ at %2$@"
           }
         }
       }
     },
-    "Every %lld days at %@, %@" : {
+    "Every %lld days at %@" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Every %1$lld days at %2$@, %3$@"
+            "value" : "Every %1$lld days at %2$@"
           }
         }
       }
@@ -283,15 +313,8 @@
     "Every %lld minutes" : {
 
     },
-    "Every day at %@, %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Every day at %1$@, %2$@"
-          }
-        }
-      }
+    "Every day at %@" : {
+
     },
     "Every day or every few days" : {
 
@@ -596,6 +619,9 @@
     "PDF" : {
 
     },
+    "Permanently delete everything in the Trash every Monday" : {
+
+    },
     "Permission denied" : {
 
     },
@@ -766,6 +792,9 @@
     "The name pattern produced an empty name" : {
 
     },
+    "The Trash was already empty" : {
+
+    },
     "then %@" : {
 
     },
@@ -773,6 +802,9 @@
 
     },
     "This rule acts on every file in %@ and can replace existing files." : {
+
+    },
+    "This rule permanently deletes everything in the Trash." : {
 
     },
     "This rule will trash every file added to %@." : {

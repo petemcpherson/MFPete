@@ -32,9 +32,10 @@ public struct RuleTemplate: Identifiable, Hashable, Sendable {
         build.make(home)
     }
 
-    /// All six templates, in the spec's order.
+    /// The spec's six templates, in its order, then Empty Trash.
     public static let all: [RuleTemplate] = [
         cleanDownloads, unzipDownloads, archiveScreenshots, keepDesktopClean, sortByType, textToMarkdown,
+        emptyTrashWeekly,
     ]
 
     /// The three shown as buttons in the empty dashboard.
@@ -145,6 +146,20 @@ public struct RuleTemplate: Identifiable, Hashable, Sendable {
                 .condition(Condition(attribute: .extension, op: .is, value: .text("txt"))),
             ]),
             actions: [.changeExtension("md"), .move(to: FolderRef(path: ""), onConflict: .keepBoth)]
+        )
+    }
+
+    /// No folders or conditions: the whole Trash, every Monday.
+    public static let emptyTrashWeekly = RuleTemplate(
+        id: "emptyTrashWeekly",
+        title: localized("Empty Trash weekly"),
+        subtitle: localized("Permanently delete everything in the Trash every Monday"),
+        systemImage: "trash.slash"
+    ) { _ in
+        Rule(
+            name: localized("Empty Trash weekly"),
+            trigger: .weekly(weekdays: [2], hour: 9, minute: 0),
+            actions: [.emptyTrash]
         )
     }
 }

@@ -63,17 +63,28 @@ public struct RuleSummarizer: Sendable {
             case .folders: return localized("When a folder is removed from \(folders)")
             case .filesAndFolders: return localized("When a file or folder is removed from \(folders)")
             }
+        case .interval, .daily, .weekly:
+            let schedule = schedulePhrase(rule.trigger) ?? ""
+            // Empty Trash rules have no folders: "Every Monday at 9:00 AM, then empty the Trash."
+            return rule.emptiesTrash ? schedule : localized("\(schedule), \(itemsIn(folders, types))")
+        }
+    }
+
+    /// "Every Monday at 9:00 AM", without folders. Nil for file events.
+    private func schedulePhrase(_ trigger: Trigger) -> String? {
+        switch trigger {
         case .interval(let minutes):
-            let every = minutes % 60 == 0
+            return minutes % 60 == 0
                 ? (minutes == 60 ? localized("Every hour") : localized("Every \(minutes / 60) hours"))
                 : localized("Every \(minutes) minutes")
-            return localized("\(every), \(itemsIn(folders, types))")
         case .daily(let hour, let minute, let days) where days > 1:
-            return localized("Every \(days) days at \(time(hour, minute)), \(itemsIn(folders, types))")
+            return localized("Every \(days) days at \(time(hour, minute))")
         case .daily(let hour, let minute, _):
-            return localized("Every day at \(time(hour, minute)), \(itemsIn(folders, types))")
+            return localized("Every day at \(time(hour, minute))")
         case .weekly(let weekdays, let hour, let minute):
-            return localized("Every \(weekdaysPhrase(weekdays)) at \(time(hour, minute)), \(itemsIn(folders, types))")
+            return localized("Every \(weekdaysPhrase(weekdays)) at \(time(hour, minute))")
+        case .fileAdded, .fileModified, .fileRemoved:
+            return nil
         }
     }
 
@@ -284,6 +295,7 @@ public struct RuleSummarizer: Sendable {
             return localized("open it with \(app.deletingPathExtension().lastPathComponent)")
         case .revealInFinder: return localized("reveal it in Finder")
         case .notify: return localized("show a notification")
+        case .emptyTrash: return localized("empty the Trash")
         case .unknown: return localized("run an unsupported action")
         }
     }

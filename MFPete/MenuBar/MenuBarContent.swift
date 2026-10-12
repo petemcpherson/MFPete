@@ -111,8 +111,6 @@ struct MenuBarContent: View {
             }
         }
 
-        Button("Empty Trash…") { TrashEmptier.confirmAndEmpty() }
-
         Divider()
 
         Button("Open Rules…") {

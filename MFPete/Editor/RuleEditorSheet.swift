@@ -42,8 +42,10 @@ struct RuleEditorSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     WhenCard(rule: $draft)
-                    IfCard(rule: $draft, matchCount: matchCount) {
-                        preview = PreviewTarget(rule: draft, mode: .matches)
+                    if !draft.emptiesTrash {
+                        IfCard(rule: $draft, matchCount: matchCount) {
+                            preview = PreviewTarget(rule: draft, mode: .matches)
+                        }
                     }
                     ThenCard(rule: $draft, sample: sample, issues: actionIssues)
                     ruleIssues
@@ -58,7 +60,10 @@ struct RuleEditorSheet: View {
         .environment(gate)
         .interactiveDismissDisabled()
         .onChange(of: draft.scope) { updateAutoName() }
-        .onChange(of: draft.actions) { updateAutoName() }
+        .onChange(of: draft.actions) {
+            if draft.emptiesTrash { fitEmptyTrash() }
+            updateAutoName()
+        }
         .task(id: MatchInputs(draft)) { await updateMatchCount() }
         .task(id: SampleInputs(draft)) { await updateSample() }
         .sheet(item: $preview) { PreviewSheet(target: $0) }
@@ -109,6 +114,16 @@ struct RuleEditorSheet: View {
                 nameIsAuto = newValue.isEmpty
             }
         )
+    }
+
+    /// Empty Trash acts on the whole Trash on a schedule: drop folders and
+    /// conditions, and switch a file-event trigger to weekly.
+    private func fitEmptyTrash() {
+        draft.scope = []
+        draft.conditions = ConditionGroup()
+        if draft.trigger.isFileEvent {
+            draft.trigger = TriggerType.weekly.makeTrigger(from: draft.trigger)
+        }
     }
 
     private func updateAutoName() {
@@ -242,6 +257,7 @@ struct RuleEditorSheet: View {
 
     /// Debounced (~400 ms) dry run against the current scope.
     private func updateMatchCount() async {
+        if draft.emptiesTrash { return }
         if draft.trigger == .fileRemoved {
             matchCount = .unavailable(String(localized: "“File removed” rules act on files that are gone, so there is nothing to count."))
             return

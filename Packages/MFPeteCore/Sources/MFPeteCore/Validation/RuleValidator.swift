@@ -28,7 +28,12 @@ public struct RuleIssue: Hashable, Sendable {
         /// A `{token}` this version does not know. It renders literally.
         case unknownToken
         /// Trash or Replace with no conditions: every file is affected.
+        /// Also Empty Trash, which deletes everything in the Trash.
         case destructiveWithoutConditions
+        /// Empty Trash needs a schedule trigger.
+        case emptyTrashNeedsSchedule
+        /// Empty Trash must be the rule's only action.
+        case emptyTrashWithOtherActions
     }
 
     public var severity: Severity
@@ -51,9 +56,14 @@ public struct RuleValidator: Sendable {
 
     public func validate(_ rule: Rule) -> [RuleIssue] {
         var issues: [RuleIssue] = []
-        issues += scopeIssues(rule)
+        if rule.emptiesTrash {
+            // No folders or conditions: the rule acts on the whole Trash.
+            issues += emptyTrashIssues(rule)
+        } else {
+            issues += scopeIssues(rule)
+            issues += conditionIssues(rule.conditions)
+        }
         issues += triggerIssues(rule.trigger)
-        issues += conditionIssues(rule.conditions)
         issues += actionIssues(rule)
         if let warning = destructiveWarning(for: rule) {
             issues.append(RuleIssue(.warning, .destructiveWithoutConditions, warning))
@@ -69,6 +79,9 @@ public struct RuleValidator: Sendable {
     /// actions include Move to Trash or a Replace policy and there are no
     /// conditions.
     public func destructiveWarning(for rule: Rule) -> String? {
+        if rule.emptiesTrash {
+            return localized("This rule permanently deletes everything in the Trash.")
+        }
         guard rule.conditions.items.isEmpty else { return nil }
         let folders = RuleValidator.folderList(rule.scope)
         let trashes = rule.actions.contains { $0 == .trash }
@@ -116,6 +129,17 @@ public struct RuleValidator: Sendable {
             return [RuleIssue(.error, .emptyFolder, localized("Choose a folder for every folder entry."))]
         }
         return []
+    }
+
+    private func emptyTrashIssues(_ rule: Rule) -> [RuleIssue] {
+        var issues: [RuleIssue] = []
+        if !rule.trigger.isSchedule {
+            issues.append(RuleIssue(.error, .emptyTrashNeedsSchedule, localized("“Empty Trash” runs on a schedule. Choose how often to run it.")))
+        }
+        if rule.actions.count > 1 {
+            issues.append(RuleIssue(.error, .emptyTrashWithOtherActions, localized("“Empty Trash” cannot be combined with other actions.")))
+        }
+        return issues
     }
 
     private func triggerIssues(_ trigger: Trigger) -> [RuleIssue] {
@@ -205,7 +229,7 @@ public struct RuleValidator: Sendable {
                 error(.unknownAction, localized("Remove the action this version of MFPete does not support."))
                 continue
             }
-            if rule.trigger == .fileRemoved, !type.worksWithoutFile {
+            if rule.trigger == .fileRemoved, !type.worksWithoutFile, !rule.emptiesTrash {
                 error(.actionNeedsFile, localized("“\(name)” cannot run when a file is removed. Use Show notification."))
             }
 
@@ -248,7 +272,7 @@ public struct RuleValidator: Sendable {
                 issues += tokenIssues(message, index: index)
             case .unarchive(let destination, _):
                 if destination?.path.isEmpty == true { missing(localized("Choose a folder to unarchive into.")) }
-            case .trash, .open, .revealInFinder, .unknown:
+            case .trash, .open, .revealInFinder, .emptyTrash, .unknown:
                 break
             }
         }

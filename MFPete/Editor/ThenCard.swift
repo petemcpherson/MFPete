@@ -51,17 +51,20 @@ struct ThenCard: View {
                     }
                 }
             }
-            Menu {
-                ForEach(allowedTypes(current: nil)) { type in
-                    Button(type.displayName) { rule.actions.append(type.makeAction()) }
+            // Empty Trash is always the only action.
+            if !rule.emptiesTrash {
+                Menu {
+                    ForEach(allowedTypes(current: nil)) { type in
+                        Button(type.displayName) { rule.actions.append(type.makeAction()) }
+                    }
+                } label: {
+                    Label("Add Action", systemImage: "plus")
                 }
-            } label: {
-                Label("Add Action", systemImage: "plus")
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .controlSize(.small)
+                .accessibilityIdentifier("addAction")
             }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .controlSize(.small)
-            .accessibilityIdentifier("addAction")
             if rule.trigger == .fileRemoved {
                 EditorHint(text: String(localized: "The file is already gone when this rule runs, so only Show notification is available."))
             }
@@ -69,8 +72,11 @@ struct ThenCard: View {
     }
 
     /// "File removed" rules allow only actions that need no file (spec §3.1).
+    /// Empty Trash is offered only where it would be the rule's only action.
     private func allowedTypes(current: ActionType?) -> [ActionType] {
-        ActionType.allCases.filter { rule.trigger != .fileRemoved || $0.worksWithoutFile || $0 == current }
+        ActionType.allCases
+            .filter { rule.trigger != .fileRemoved || $0.worksWithoutFile || $0 == current }
+            .filter { $0 != .emptyTrash || rule.actions.count <= (current == nil ? 0 : 1) }
     }
 
     private func actionBinding(_ index: Int) -> Binding<Action> {
@@ -230,6 +236,11 @@ private struct ActionParameters: View {
                 pattern: Binding(get: { message }, set: { action = .notify(message: $0) }),
                 preview: renderedText
             )
+        case .emptyTrash:
+            Text("Permanently deletes everything in the Trash. The first run asks for permission to control Finder.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         case .trash, .revealInFinder, .unknown:
             EmptyView()
         }

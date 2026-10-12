@@ -49,11 +49,22 @@ struct KindClassifierTests {
         ("sheet.xlsx", .document),
         ("bundle.zip", .archive),
         ("source.tar.gz", .archive),
+        ("photos.rar", .archive),
+        ("backup.RAR", .archive),
+        ("logs.tar.xz", .archive),
         ("installer.dmg", .diskImage),
         ("blob.qqqzzz", .other),
     ])
     func classifiesByType(name: String, kind: FileKind) {
         #expect(snap(name).kind == kind)
+    }
+
+    /// The editor shows these extensions next to each kind, so they must be true.
+    @Test(arguments: FileKind.allCases)
+    func sampleExtensionsMatchKind(kind: FileKind) {
+        for ext in kind.sampleExtensions where kind != .application {
+            #expect(snap("sample.\(ext)").kind == kind, "\(ext)")
+        }
     }
 
     @Test func precedence() {

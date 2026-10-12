@@ -62,7 +62,8 @@ public struct FileSnapshot: Hashable, Sendable {
             contentType: type,
             isDirectory: isDirectory,
             isPackage: isPackage,
-            isAlias: isAlias
+            isAlias: isAlias,
+            fileExtension: url.pathExtension
         )
         self.fileSize = fileSize
         self.totalFileAllocatedSize = totalFileAllocatedSize

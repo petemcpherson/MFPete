@@ -177,6 +177,11 @@ public enum Attribute: String, Codable, Hashable, Sendable, CaseIterable {
     public func allows(_ op: Operator) -> Bool {
         allowedOperators.contains(op)
     }
+
+    /// Text attributes where `Condition.caseSensitive` applies.
+    public var supportsMatchCase: Bool {
+        self == .name || self == .fullName || self == .downloadedFrom
+    }
 }
 
 /// Comparison operators. Which ones apply depends on the attribute
@@ -345,6 +350,8 @@ public enum DurationUnit: String, Codable, Hashable, Sendable, CaseIterable {
 
 /// File kinds for the Kind attribute (spec §4.2).
 public enum FileKind: String, Codable, Hashable, Sendable, CaseIterable {
+    /// Anything but a folder. Never a classification result; see `includes(_:)`.
+    case file
     case folder
     case image
     case movie
@@ -360,6 +367,7 @@ public enum FileKind: String, Codable, Hashable, Sendable, CaseIterable {
 
     public var displayName: String {
         switch self {
+        case .file: return localized("File")
         case .folder: return localized("Folder")
         case .image: return localized("Image")
         case .movie: return localized("Movie")
@@ -373,5 +381,29 @@ public enum FileKind: String, Codable, Hashable, Sendable, CaseIterable {
         case .alias: return localized("Alias")
         case .other: return localized("Other")
         }
+    }
+
+    /// Typical extensions shown next to the name so users know what a kind
+    /// covers. Illustrative only: classification goes by UTType.
+    public var sampleExtensions: [String] {
+        switch self {
+        case .image: return ["jpg", "png", "heic"]
+        case .movie: return ["mp4", "mov"]
+        case .audio: return ["mp3", "m4a", "wav"]
+        case .text: return ["txt", "md", "csv"]
+        case .document: return ["docx", "pages", "xlsx"]
+        case .archive: return ["zip", "rar", "7z"]
+        case .diskImage: return ["dmg", "iso"]
+        case .application: return ["app"]
+        case .file, .folder, .pdf, .alias, .other: return []
+        }
+    }
+
+    /// Display name plus sample extensions, e.g. "Disk Image (.dmg, .iso)".
+    public var displayNameWithSamples: String {
+        if self == .file { return localized("File (anything but a folder)") }
+        guard !sampleExtensions.isEmpty else { return displayName }
+        let samples = sampleExtensions.map { "." + $0 }.joined(separator: ", ")
+        return "\(displayName) (\(samples))"
     }
 }

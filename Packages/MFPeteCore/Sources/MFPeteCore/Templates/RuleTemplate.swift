@@ -93,6 +93,7 @@ public struct RuleTemplate: Identifiable, Hashable, Sendable {
             scope: [FolderRef(expanding: "~/Screenshots", home: home)],
             trigger: .daily(hour: 18, minute: 0),
             conditions: ConditionGroup(items: [
+                .condition(.filesOnly),
                 .condition(Condition(attribute: .name, op: .startsWith, value: .text("Screenshot"))),
                 .condition(Condition(attribute: .dateAdded, op: .notInTheLast, value: .duration(3, .days))),
             ]),
@@ -110,6 +111,7 @@ public struct RuleTemplate: Identifiable, Hashable, Sendable {
             name: localized("Keep Desktop clean"),
             scope: [FolderRef(expanding: "~/Desktop", home: home)],
             conditions: ConditionGroup(items: [
+                .condition(.filesOnly),
                 .condition(Condition(attribute: .kind, op: .isNot, value: .kind(.alias))),
             ]),
             actions: [.move(to: FolderRef(expanding: "~/Desktop Inbox", home: home), onConflict: .keepBoth)]
@@ -125,6 +127,7 @@ public struct RuleTemplate: Identifiable, Hashable, Sendable {
     ) { _ in
         Rule(
             name: localized("Sort by type"),
+            conditions: ConditionGroup(items: [.condition(.filesOnly)]),
             actions: [.sortIntoSubfolder(base: FolderRef(path: ""), pattern: "{extension}")]
         )
     }

@@ -50,18 +50,20 @@ struct RuleSummarizerTests {
                 scope: [screenshots],
                 trigger: .daily(hour: 18, minute: 30),
                 conditions: ConditionGroup(items: [
+                    .condition(.filesOnly),
                     condition(.name, .startsWith, .text("Screenshot")),
                     condition(.dateAdded, .notInTheLast, .duration(3, .days)),
                 ]),
                 actions: [.move(to: FolderRef(path: "/Users/me/Screenshots/Archive"), onConflict: .keepBoth)]
-            ), "Every day at 6:30\u{202F}PM, for files in Screenshots, if its name starts with “Screenshot” and its date added is not in the last 3 days, then move it to Archive."),
+            ), "Every day at 6:30\u{202F}PM, for files in Screenshots, if its name without extension starts with “Screenshot” and its date added is not in the last 3 days, then move it to Archive."),
             (Rule(
                 scope: [desktop],
-                conditions: ConditionGroup(items: [condition(.kind, .isNot, .kind(.alias))]),
+                conditions: ConditionGroup(items: [.condition(.filesOnly), condition(.kind, .isNot, .kind(.alias))]),
                 actions: [.move(to: inbox, onConflict: .keepBoth)]
             ), "When a file is added to Desktop, if its kind is not Alias, then move it to Desktop Inbox."),
             (Rule(
                 scope: [documents],
+                conditions: ConditionGroup(items: [.condition(.filesOnly)]),
                 actions: [.sortIntoSubfolder(base: documents, pattern: "{extension}")]
             ), "When a file is added to Documents, then sort it into Documents/{extension}."),
             (Rule(
@@ -76,7 +78,11 @@ struct RuleSummarizerTests {
     }
 
     @Test func triggers() {
-        let base = Rule(scope: [downloads, FolderRef(path: "/Users/me/Desktop")], actions: [.revealInFinder])
+        let base = Rule(
+            scope: [downloads, FolderRef(path: "/Users/me/Desktop")],
+            conditions: ConditionGroup(items: [.condition(.filesOnly)]),
+            actions: [.revealInFinder]
+        )
         func phrase(_ trigger: Trigger) -> String {
             var rule = base
             rule.trigger = trigger
@@ -96,11 +102,35 @@ struct RuleSummarizerTests {
         #expect(summarizer.triggerPhrase(empty) == "When a file is added to a folder")
     }
 
+    @Test func itemTypeNouns() {
+        func sentence(_ trigger: Trigger, _ items: [ConditionItem], match: Match = .all) -> String {
+            summarizer.sentence(for: Rule(
+                scope: [downloads],
+                trigger: trigger,
+                conditions: ConditionGroup(match: match, items: items),
+                actions: [.trash]
+            ))
+        }
+        #expect(sentence(.fileAdded, []) == "When a file or folder is added to Downloads, then move it to the Trash.")
+        #expect(sentence(.fileAdded, [.condition(.filesOnly)]) == "When a file is added to Downloads, then move it to the Trash.")
+        #expect(sentence(.fileRemoved, [condition(.kind, .is, .kind(.folder))]) == "When a folder is removed from Downloads, then move it to the Trash.")
+        #expect(sentence(.daily(hour: 9, minute: 0), [condition(.name, .contains, .text("old"))])
+            == "Every day at 9:00\u{202F}AM, for files and folders in Downloads, if its name without extension contains “old”, then move it to the Trash.")
+        #expect(sentence(.daily(hour: 9, minute: 0, days: 3), [])
+            == "Every 3 days at 9:00\u{202F}AM, for files and folders in Downloads, then move it to the Trash.")
+        #expect(sentence(.interval(minutes: 60), [condition(.kind, .isNot, .kind(.folder))]) == "Every hour, for files in Downloads, then move it to the Trash.")
+        // Informative kinds stay in the sentence.
+        #expect(sentence(.fileAdded, [condition(.kind, .is, .kind(.image))]) == "When a file is added to Downloads, if its kind is Image, then move it to the Trash.")
+        // In an Any group the type condition is not implied, so it stays.
+        #expect(sentence(.fileAdded, [.condition(.filesOnly), condition(.name, .contains, .text("x"))], match: .any)
+            == "When a file or folder is added to Downloads, if its kind is File or its name without extension contains “x”, then move it to the Trash.")
+    }
+
     @Test func conditionPhrases() {
         func phrase(_ item: ConditionItem) -> String? {
             summarizer.conditionsPhrase(ConditionGroup(items: [item]))
         }
-        #expect(phrase(condition(.fullName, .matchesPattern, .text("IMG_*"))) == "its full name matches “IMG_*”")
+        #expect(phrase(condition(.fullName, .matchesPattern, .text("IMG_*"))) == "its name with extension matches “IMG_*”")
         #expect(phrase(condition(.size, .greaterThan, .size(1.5, .gb))) == "its size is greater than 1.5 GB")
         #expect(phrase(condition(.size, .lessThan, .size(10, .kb))) == "its size is less than 10 KB")
         #expect(phrase(condition(.dateModified, .inTheLast, .duration(1, .hours))) == "its date modified is in the last hour")
@@ -110,6 +140,8 @@ struct RuleSummarizerTests {
         #expect(phrase(condition(.tags, .hasNoTags)) == "it has no tags")
         #expect(phrase(condition(.downloadedFrom, .contains, .text("github.com"))) == "its download source contains “github.com”")
         #expect(phrase(condition(.anyFile, .always)) == "it is any file")
+        #expect(phrase(.condition(Condition(attribute: .name, op: .startsWith, value: .text("IMG"), caseSensitive: true)))
+            == "its name without extension starts with “IMG” (match case)")
         #expect(summarizer.conditionsPhrase(ConditionGroup()) == nil)
 
         let any = ConditionGroup(match: .any, items: [

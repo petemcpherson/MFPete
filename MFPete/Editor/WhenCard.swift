@@ -4,7 +4,6 @@ import SwiftUI
 /// WHEN: the trigger, the folders it watches, and scope options (spec §8.3).
 struct WhenCard: View {
     @Binding var rule: Rule
-    @State private var showsMoreTriggers = false
     @State private var showsOptions = false
 
     @Environment(FolderGate.self) private var gate
@@ -13,7 +12,7 @@ struct WhenCard: View {
         EditorCard(title: "WHEN") {
             HStack(spacing: 8) {
                 Picker("Trigger", selection: triggerType) {
-                    ForEach(visibleTriggerTypes) { type in
+                    ForEach(TriggerType.allCases) { type in
                         Text(type.displayName).tag(type)
                     }
                 }
@@ -23,14 +22,6 @@ struct WhenCard: View {
                 Text(rule.trigger.isFileEvent ? "in" : "scan")
                     .foregroundStyle(.secondary)
                 Spacer()
-                // "File modified" and "File removed" hide behind this (spec §3.1).
-                if !rule.trigger.type.isMoreTrigger {
-                    Button(showsMoreTriggers ? "Fewer Triggers" : "More Triggers") {
-                        showsMoreTriggers.toggle()
-                    }
-                    .buttonStyle(.link)
-                    .font(.callout)
-                }
             }
             ScheduleControls(trigger: $rule.trigger)
 
@@ -47,13 +38,8 @@ struct WhenCard: View {
             .font(.callout)
         }
         .onAppear {
-            showsMoreTriggers = rule.trigger.type.isMoreTrigger
             showsOptions = rule.options.includeSubfolders || rule.options.includeHidden
         }
-    }
-
-    private var visibleTriggerTypes: [TriggerType] {
-        TriggerType.allCases.filter { !$0.isMoreTrigger || showsMoreTriggers || $0 == rule.trigger.type }
     }
 
     private var triggerType: Binding<TriggerType> {
@@ -126,10 +112,16 @@ private struct ScheduleControls: View {
                 }
             }
             .onAppear { usesHours = minutes >= 60 && minutes % 60 == 0 }
-        case .daily(let hour, let minute):
+        case .daily(let hour, let minute, let days):
             HStack(spacing: 6) {
-                Text("At")
-                timePicker(hour: hour, minute: minute) { trigger = .daily(hour: $0, minute: $1) }
+                Text("Every")
+                NumberField(value: Binding(
+                    get: { days },
+                    set: { trigger = .daily(hour: hour, minute: minute, days: $0) }
+                ), minimum: 1)
+                .accessibilityIdentifier("dailyDays")
+                Text(days == 1 ? "day at" : "days at")
+                timePicker(hour: hour, minute: minute) { trigger = .daily(hour: $0, minute: $1, days: days) }
             }
         case .weekly(let weekdays, let hour, let minute):
             VStack(alignment: .leading, spacing: 6) {

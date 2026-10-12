@@ -24,7 +24,7 @@ public struct RuleSummarizer: Sendable {
 
     public func sentence(for rule: Rule) -> String {
         var parts = [triggerPhrase(rule)]
-        if let conditions = conditionsPhrase(rule.conditions) {
+        if let conditions = conditionsPhrase(summaryConditions(rule)) {
             parts.append(localized("if \(conditions)"))
         }
         parts.append(localized("then \(actionsPhrase(rule.actions))"))
@@ -33,7 +33,7 @@ public struct RuleSummarizer: Sendable {
 
     public func shortSummary(for rule: Rule) -> ShortSummary {
         var first = triggerPhrase(rule)
-        if let conditions = conditionsPhrase(rule.conditions) {
+        if let conditions = conditionsPhrase(summaryConditions(rule)) {
             first += ", " + localized("if \(conditions)")
         }
         return ShortSummary(trigger: first, actions: capitalizedFirst(actionsPhrase(rule.actions)))
@@ -43,23 +43,59 @@ public struct RuleSummarizer: Sendable {
 
     func triggerPhrase(_ rule: Rule) -> String {
         let folders = foldersPhrase(rule.scope)
+        let types = rule.conditions.itemTypes
         switch rule.trigger {
         case .fileAdded:
-            return localized("When a file is added to \(folders)")
+            switch types {
+            case .files: return localized("When a file is added to \(folders)")
+            case .folders: return localized("When a folder is added to \(folders)")
+            case .filesAndFolders: return localized("When a file or folder is added to \(folders)")
+            }
         case .fileModified:
-            return localized("When a file is modified in \(folders)")
+            switch types {
+            case .files: return localized("When a file is modified in \(folders)")
+            case .folders: return localized("When a folder is modified in \(folders)")
+            case .filesAndFolders: return localized("When a file or folder is modified in \(folders)")
+            }
         case .fileRemoved:
-            return localized("When a file is removed from \(folders)")
+            switch types {
+            case .files: return localized("When a file is removed from \(folders)")
+            case .folders: return localized("When a folder is removed from \(folders)")
+            case .filesAndFolders: return localized("When a file or folder is removed from \(folders)")
+            }
         case .interval(let minutes):
             let every = minutes % 60 == 0
                 ? (minutes == 60 ? localized("Every hour") : localized("Every \(minutes / 60) hours"))
                 : localized("Every \(minutes) minutes")
-            return localized("\(every), for files in \(folders)")
-        case .daily(let hour, let minute):
-            return localized("Every day at \(time(hour, minute)), for files in \(folders)")
+            return localized("\(every), \(itemsIn(folders, types))")
+        case .daily(let hour, let minute, let days) where days > 1:
+            return localized("Every \(days) days at \(time(hour, minute)), \(itemsIn(folders, types))")
+        case .daily(let hour, let minute, _):
+            return localized("Every day at \(time(hour, minute)), \(itemsIn(folders, types))")
         case .weekly(let weekdays, let hour, let minute):
-            return localized("Every \(weekdaysPhrase(weekdays)) at \(time(hour, minute)), for files in \(folders)")
+            return localized("Every \(weekdaysPhrase(weekdays)) at \(time(hour, minute)), \(itemsIn(folders, types))")
         }
+    }
+
+    private func itemsIn(_ folders: String, _ types: ItemTypes) -> String {
+        switch types {
+        case .files: return localized("for files in \(folders)")
+        case .folders: return localized("for folders in \(folders)")
+        case .filesAndFolders: return localized("for files and folders in \(folders)")
+        }
+    }
+
+    /// Top-level conditions minus "Kind is File/Folder" ones the trigger
+    /// phrase already says ("for files in…").
+    private func summaryConditions(_ rule: Rule) -> ConditionGroup {
+        var group = rule.conditions
+        guard group.match == .all || group.items.count == 1 else { return group }
+        let types = group.itemTypes
+        group.items.removeAll { item in
+            guard case .condition(let condition) = item, condition.isItemTypeCondition else { return false }
+            return (types == .files && condition.excludesFolders) || (types == .folders && condition.excludesFiles)
+        }
+        return group
     }
 
     private func foldersPhrase(_ scope: [FolderRef]) -> String {
@@ -117,10 +153,16 @@ public struct RuleSummarizer: Sendable {
     }
 
     func conditionPhrase(_ condition: Condition) -> String {
+        let phrase = basePhrase(condition)
+        guard condition.caseSensitive, condition.attribute.supportsMatchCase else { return phrase }
+        return localized("\(phrase) (match case)")
+    }
+
+    private func basePhrase(_ condition: Condition) -> String {
         let value = valuePhrase(condition)
         switch condition.attribute {
-        case .name: return localized("its name \(textOperator(condition.op)) \(value)")
-        case .fullName: return localized("its full name \(textOperator(condition.op)) \(value)")
+        case .name: return localized("its name without extension \(textOperator(condition.op)) \(value)")
+        case .fullName: return localized("its name with extension \(textOperator(condition.op)) \(value)")
         case .extension:
             switch condition.op {
             case .isNot: return localized("its extension is not \(value)")

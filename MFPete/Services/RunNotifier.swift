@@ -140,6 +140,10 @@ enum NotificationPermission {
     }
 
     static func isDenied() async -> Bool {
-        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied
+        await status() == .denied
+    }
+
+    static func status() async -> UNAuthorizationStatus {
+        await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 }

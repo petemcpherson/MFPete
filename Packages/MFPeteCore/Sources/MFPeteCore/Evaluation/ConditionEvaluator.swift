@@ -47,7 +47,7 @@ public struct ConditionEvaluator: Sendable {
         case (.extension, .text(let text)):
             return compareExtension(snapshot.fileExtension, condition.op, text)
         case (.kind, .kind(let kind)):
-            return condition.op == .is ? snapshot.kind == kind : snapshot.kind != kind
+            return condition.op == .is ? kind.includes(snapshot.kind) : !kind.includes(snapshot.kind)
         case (.size, .size(let amount, let unit)):
             guard let size = snapshot.fileSize else { return false }
             let limit = amount * unit.bytes

@@ -41,8 +41,18 @@ struct IfCard: View {
             }
             .controlSize(.small)
 
-            if RuleValidator.matchesEverything(rule) {
-                EditorHint(text: String(localized: "Matches all files in this folder."), style: .warning)
+            if RuleValidator.showsFolderHint(rule) {
+                HStack(spacing: 8) {
+                    EditorHint(text: String(localized: "This rule also moves or changes folders, not just files."), style: .warning)
+                    if let restricted = rule.restrictedToFiles() {
+                        Button("Files Only") { rule = restricted }
+                            .controlSize(.small)
+                            .help(Text("Adds “Kind is File” so folders are skipped."))
+                            .accessibilityIdentifier("filesOnly")
+                    }
+                }
+            } else if RuleValidator.matchesEverything(rule) {
+                EditorHint(text: String(localized: "Matches every file and folder in this folder."), style: .warning)
             }
             if RuleValidator.showsAgeHint(rule) {
                 EditorHint(text: String(localized: "Age conditions work best on a schedule. A file that was just added is never older than a few seconds."))
@@ -60,9 +70,9 @@ struct IfCard: View {
                 Text(reason).foregroundStyle(.secondary)
             case .counting:
                 ProgressView().controlSize(.small)
-                Text("Counting matching files…").foregroundStyle(.secondary)
+                Text(Self.countingText(rule.conditions.itemTypes)).foregroundStyle(.secondary)
             case .counted(let total, let processed):
-                Text(Self.countText(total: total, processed: processed))
+                Text(Self.countText(total: total, processed: processed, types: rule.conditions.itemTypes))
                     .accessibilityIdentifier("matchCount")
             }
             Spacer()
@@ -73,11 +83,23 @@ struct IfCard: View {
         .font(.callout)
     }
 
-    static func countText(total: Int, processed: Int) -> String {
-        if processed > 0 {
-            return String(localized: "Matches \(total) files right now (\(processed) already processed)")
+    static func countText(total: Int, processed: Int, types: ItemTypes) -> String {
+        switch (types, processed > 0) {
+        case (.files, true): return String(localized: "Matches \(total) files right now (\(processed) already processed)")
+        case (.files, false): return String(localized: "Matches \(total) files right now")
+        case (.folders, true): return String(localized: "Matches \(total) folders right now (\(processed) already processed)")
+        case (.folders, false): return String(localized: "Matches \(total) folders right now")
+        case (.filesAndFolders, true): return String(localized: "Matches \(total) files and folders right now (\(processed) already processed)")
+        case (.filesAndFolders, false): return String(localized: "Matches \(total) files and folders right now")
         }
-        return String(localized: "Matches \(total) files right now")
+    }
+
+    static func countingText(_ types: ItemTypes) -> String {
+        switch types {
+        case .files: return String(localized: "Counting matching files…")
+        case .folders: return String(localized: "Counting matching folders…")
+        case .filesAndFolders: return String(localized: "Counting matching files and folders…")
+        }
     }
 }
 
@@ -230,6 +252,15 @@ private struct ConditionRow: View {
             ConditionValueField(condition: $condition)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+            if condition.attribute.supportsMatchCase {
+                Toggle(isOn: $condition.caseSensitive) {
+                    Text(verbatim: "Aa")
+                }
+                .toggleStyle(.button)
+                .help(Text(condition.caseSensitive ? "Match case: on (Invoice ≠ invoice)" : "Match case: off (Invoice = invoice)"))
+                .accessibilityLabel(Text("Match case"))
+            }
+
             RowIconButton(systemImage: "minus.circle", label: "Remove condition", action: onRemove)
             RowIconButton(systemImage: "plus.circle", label: "Add condition below", action: onAdd)
         }
@@ -274,7 +305,7 @@ private struct ConditionValueField: View {
                 .fixedSize()
         case .kind(let kind):
             Picker("Kind", selection: Binding(get: { kind }, set: { condition.value = .kind($0) })) {
-                ForEach(FileKind.allCases, id: \.self) { Text($0.displayName).tag($0) }
+                ForEach(FileKind.allCases, id: \.self) { Text($0.displayNameWithSamples).tag($0) }
             }
             .labelsHidden()
             .fixedSize()

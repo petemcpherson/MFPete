@@ -7,7 +7,8 @@ public enum Trigger: Codable, Hashable, Sendable {
     case fileRemoved
     /// Every N minutes. Minimum 5 (enforced by validation).
     case interval(minutes: Int)
-    case daily(hour: Int, minute: Int)
+    /// At a time of day, every `days` days (1 = every day).
+    case daily(hour: Int, minute: Int, days: Int = 1)
     /// Weekdays use `Calendar` numbering: 1 = Sunday … 7 = Saturday.
     case weekly(weekdays: Set<Int>, hour: Int, minute: Int)
 
@@ -27,7 +28,7 @@ public enum Trigger: Codable, Hashable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case type, minutes, hour, minute, weekdays
+        case type, minutes, hour, minute, days, weekdays
     }
 
     public init(from decoder: Decoder) throws {
@@ -41,7 +42,8 @@ public enum Trigger: Codable, Hashable, Sendable {
         case .daily:
             self = .daily(
                 hour: try container.decode(Int.self, forKey: .hour),
-                minute: try container.decode(Int.self, forKey: .minute)
+                minute: try container.decode(Int.self, forKey: .minute),
+                days: try container.decodeIfPresent(Int.self, forKey: .days) ?? 1
             )
         case .weekly:
             self = .weekly(
@@ -64,10 +66,14 @@ public enum Trigger: Codable, Hashable, Sendable {
         case .interval(let minutes):
             try container.encode(Kind.interval.rawValue, forKey: .type)
             try container.encode(minutes, forKey: .minutes)
-        case .daily(let hour, let minute):
+        case .daily(let hour, let minute, let days):
             try container.encode(Kind.daily.rawValue, forKey: .type)
             try container.encode(hour, forKey: .hour)
             try container.encode(minute, forKey: .minute)
+            // Omitted for every day, so existing files stay unchanged.
+            if days != 1 {
+                try container.encode(days, forKey: .days)
+            }
         case .weekly(let weekdays, let hour, let minute):
             try container.encode(Kind.weekly.rawValue, forKey: .type)
             try container.encode(weekdays.sorted(), forKey: .weekdays)

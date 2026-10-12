@@ -169,7 +169,7 @@ public actor TriggerCoordinator {
                 case .fileAdded, .fileModified:
                     await offerApplyExisting(rule)
                 case .interval, .daily, .weekly:
-                    state.setLastScheduledRun(now, ruleID: rule.id)
+                    state.setLastScheduledRun(scheduler.initialLastRun(for: rule.trigger, now: now), ruleID: rule.id)
                 case .fileRemoved:
                     break
                 }
@@ -387,7 +387,7 @@ public actor TriggerCoordinator {
         for rule in rules where rule.isEnabled && rule.trigger.isSchedule && !rule.containsUnknownElements {
             guard let last = state.lastScheduledRun(ruleID: rule.id) else {
                 // New rule: its clock starts now.
-                state.setLastScheduledRun(current, ruleID: rule.id)
+                state.setLastScheduledRun(scheduler.initialLastRun(for: rule.trigger, now: current), ruleID: rule.id)
                 continue
             }
             let reason: RunTrigger
@@ -415,7 +415,7 @@ public actor TriggerCoordinator {
         return rules
             .filter { $0.isEnabled && $0.trigger.isSchedule && !$0.containsUnknownElements }
             .filter { ruleID == nil || $0.id == ruleID }
-            .compactMap { scheduler.nextFireDate(for: $0.trigger, after: state.lastScheduledRun(ruleID: $0.id) ?? current) }
+            .compactMap { scheduler.nextFireDate(for: $0.trigger, after: state.lastScheduledRun(ruleID: $0.id) ?? scheduler.initialLastRun(for: $0.trigger, now: current)) }
             .min()
     }
 

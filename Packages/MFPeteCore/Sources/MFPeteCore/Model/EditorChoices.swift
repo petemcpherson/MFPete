@@ -14,16 +14,11 @@ public enum TriggerType: String, Hashable, Sendable, CaseIterable, Identifiable 
 
     public var id: String { rawValue }
 
-    /// Shown only under the "More triggers" disclosure (spec §3.1).
-    public var isMoreTrigger: Bool {
-        self == .fileModified || self == .fileRemoved
-    }
-
     public var displayName: String {
         switch self {
         case .fileAdded: return localized("A file is added")
         case .interval: return localized("Every few minutes or hours")
-        case .daily: return localized("Every day")
+        case .daily: return localized("Every day or every few days")
         case .weekly: return localized("Every week")
         case .fileModified: return localized("A file is modified")
         case .fileRemoved: return localized("A file is removed")
@@ -35,7 +30,7 @@ public enum TriggerType: String, Hashable, Sendable, CaseIterable, Identifiable 
     public func makeTrigger(from current: Trigger) -> Trigger {
         var time = (hour: 9, minute: 0)
         switch current {
-        case .daily(let hour, let minute), .weekly(_, let hour, let minute):
+        case .daily(let hour, let minute, _), .weekly(_, let hour, let minute):
             time = (hour, minute)
         default:
             break
@@ -47,7 +42,9 @@ public enum TriggerType: String, Hashable, Sendable, CaseIterable, Identifiable 
         case .interval:
             if case .interval = current { return current }
             return .interval(minutes: 60)
-        case .daily: return .daily(hour: time.hour, minute: time.minute)
+        case .daily:
+            if case .daily = current { return current }
+            return .daily(hour: time.hour, minute: time.minute)
         case .weekly:
             if case .weekly = current { return current }
             // Monday (Calendar numbering: 1 = Sunday).
@@ -163,8 +160,8 @@ extension ConflictPolicy {
 extension Attribute {
     public var displayName: String {
         switch self {
-        case .name: return localized("Name")
-        case .fullName: return localized("Full name")
+        case .name: return localized("Name (no extension)")
+        case .fullName: return localized("Name with extension")
         case .extension: return localized("Extension")
         case .kind: return localized("Kind")
         case .size: return localized("Size")
@@ -216,6 +213,7 @@ extension Condition {
         guard attribute.allows(op) else { return attribute.makeCondition() }
         var copy = self
         copy.attribute = attribute
+        if !attribute.supportsMatchCase { copy.caseSensitive = false }
         let type = op.valueType(for: attribute)
         if value.valueType != type { copy.value = .empty(type) }
         return copy

@@ -144,7 +144,7 @@ struct RulesWindow: View {
     }
 
     private func newRule(from template: RuleTemplate? = nil) {
-        editing = EditorTarget(rule: template?.makeRule(home: appState.templateHome) ?? Rule(), isNew: true)
+        editing = EditorTarget(rule: template?.makeRule(home: appState.templateHome) ?? Rule.newBlank(), isNew: true)
     }
 
     /// Drag reorder, only on the full list in manual order.

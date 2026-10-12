@@ -23,17 +23,26 @@ public enum KindClassifier {
         UTType("org.tukaani.xz-archive"),
     ].compactMap { $0 }
 
+    /// Archive formats macOS has no built-in type for. Without an app that
+    /// declares them, these files get a dynamic type that conforms to nothing.
+    private static let fallbackArchiveExtensions: Set<String> = ["rar", "xz"]
+
     public static func classify(
         contentType: UTType?,
         isDirectory: Bool,
         isPackage: Bool,
-        isAlias: Bool
+        isAlias: Bool,
+        fileExtension: String = ""
     ) -> FileKind {
         if isAlias { return .alias }
         if let type = contentType, type.conforms(to: .application) || type.conforms(to: .applicationBundle) {
             return .application
         }
         if isDirectory && !isPackage { return .folder }
+        if contentType?.isDynamic ?? true,
+           fallbackArchiveExtensions.contains(fileExtension.lowercased()) {
+            return .archive
+        }
         guard let type = contentType else { return isDirectory ? .folder : .other }
 
         if type.conforms(to: .pdf) { return .pdf }

@@ -1,7 +1,1070 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "" : {
 
+    },
+    "“%@” wants to act on %lld files." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "“%1$@” wants to act on %2$lld files."
+          }
+        }
+      }
+    },
+    "“File removed” rules act on files that are gone, so there is nothing to count." : {
+
+    },
+    "{%@}" : {
+
+    },
+    "{name}.{extension}" : {
+
+    },
+    "{year}/{month}" : {
+
+    },
+    "%@ copy" : {
+
+    },
+    "%@: skipped (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: skipped (%2$@)"
+          }
+        }
+      }
+    },
+    "%@: would fail (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: would fail (%2$@)"
+          }
+        }
+      }
+    },
+    "%@. Click to open Privacy & Security." : {
+
+    },
+    "%lld files" : {
+
+    },
+    "%lld matching files" : {
+
+    },
+    "%lld matching files, %lld already processed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld matching files, %2$lld already processed"
+          }
+        }
+      }
+    },
+    "%lld s" : {
+
+    },
+    "%lld." : {
+
+    },
+    "→ %@" : {
+
+    },
+    "A file is added to Downloads" : {
+
+    },
+    "A rule watches a folder and tidies new files for you. Start from a template:" : {
+
+    },
+    "A summary after every run that acted on files, plus errors and Run Now." : {
+
+    },
+    "A summary when something fails, after Run Now, and for rules with “Notify on each run”." : {
+
+    },
+    "About" : {
+
+    },
+    "Action" : {
+
+    },
+    "Action %lld" : {
+
+    },
+    "Action not supported by this version" : {
+
+    },
+    "Actions for %@" : {
+
+    },
+    "Activity" : {
+
+    },
+    "Activity log" : {
+
+    },
+    "Add Action" : {
+
+    },
+    "Add Condition" : {
+
+    },
+    "Add condition below" : {
+
+    },
+    "Add Folder" : {
+
+    },
+    "Add Group" : {
+
+    },
+    "Add Rule" : {
+
+    },
+    "Adds “Kind is File” so folders are skipped." : {
+
+    },
+    "Advanced" : {
+
+    },
+    "Age conditions work best on a schedule. A file that was just added is never older than a few seconds." : {
+
+    },
+    "All" : {
+
+    },
+    "All entries are deleted. Files and rules are not changed." : {
+
+    },
+    "All Folders" : {
+
+    },
+    "All items in the Trash will be deleted permanently. You can’t undo this action." : {
+
+    },
+    "All Rules" : {
+
+    },
+    "All rules are paused. Run Now still works." : {
+
+    },
+    "Allow Notifications…" : {
+
+    },
+    "Allowed" : {
+
+    },
+    "Already processed, skipped" : {
+
+    },
+    "Amount" : {
+
+    },
+    "Any" : {
+
+    },
+    "Any Trigger" : {
+
+    },
+    "Apply" : {
+
+    },
+    "Apply “%@” to the %lld files already in %@ that match?" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Apply “%1$@” to the %2$lld files already in %3$@ that match?"
+          }
+        }
+      }
+    },
+    "Apply to Existing Files?" : {
+
+    },
+    "Ask before acting on more than" : {
+
+    },
+    "At" : {
+
+    },
+    "Attribute" : {
+
+    },
+    "Automatically check for updates" : {
+
+    },
+    "Back" : {
+
+    },
+    "Cancel" : {
+
+    },
+    "Cancel Run" : {
+
+    },
+    "Check for Updates…" : {
+
+    },
+    "Checking the rule's folders…" : {
+
+    },
+    "Choose" : {
+
+    },
+    "Choose a folder to see matching files." : {
+
+    },
+    "Choose a folder…" : {
+
+    },
+    "Choose App…" : {
+
+    },
+    "Choose the base folder…" : {
+
+    },
+    "Choose…" : {
+
+    },
+    "Clear Filters" : {
+
+    },
+    "Clear Log" : {
+
+    },
+    "Clear search and filters to drag rules into a new order." : {
+
+    },
+    "Clear the activity log" : {
+
+    },
+    "Clear the Activity Log?" : {
+
+    },
+    "Click Allow in the banner\nat the top right." : {
+
+    },
+    "Click the icon to open your rules, run one now, or pause everything." : {
+
+    },
+    "Condition not supported by this version" : {
+
+    },
+    "Continue" : {
+
+    },
+    "Copy Path" : {
+
+    },
+    "Could not empty the Trash" : {
+
+    },
+    "Could not import rules" : {
+
+    },
+    "Could not save rules: %@" : {
+
+    },
+    "Counting matching files and folders…" : {
+
+    },
+    "Counting matching files…" : {
+
+    },
+    "Counting matching folders…" : {
+
+    },
+    "Create Blank Rule" : {
+
+    },
+    "Create Your First Rule" : {
+
+    },
+    "Date" : {
+
+    },
+    "Date Created" : {
+
+    },
+    "day at" : {
+
+    },
+    "days at" : {
+
+    },
+    "Default app" : {
+
+    },
+    "Delete" : {
+
+    },
+    "Delete “%@”?" : {
+
+    },
+    "Delete %lld Rules?" : {
+
+    },
+    "Delete %lld Rules…" : {
+
+    },
+    "Delete…" : {
+
+    },
+    "Disabled" : {
+
+    },
+    "Discard Changes" : {
+
+    },
+    "Discard changes to this rule?" : {
+
+    },
+    "Dismiss" : {
+
+    },
+    "dmg, zip" : {
+
+    },
+    "Done" : {
+
+    },
+    "Drag to reorder" : {
+
+    },
+    "Drag to reorder works only with Manual sort. Rules still run in manual order." : {
+
+    },
+    "Duplicate" : {
+
+    },
+    "Each file a rule acts on appears here. Entries are kept for 30 days." : {
+
+    },
+    "Each rule acts on a file once until it changes. Resetting makes every rule re-check existing files on its next run." : {
+
+    },
+    "Edit…" : {
+
+    },
+    "Empty the Trash?" : {
+
+    },
+    "Empty Trash" : {
+
+    },
+    "Empty Trash…" : {
+
+    },
+    "Enable %@" : {
+
+    },
+    "Enabled" : {
+
+    },
+    "Errors Only" : {
+
+    },
+    "Every" : {
+
+    },
+    "Every rule will act again on matching files that are already in its folders." : {
+
+    },
+    "Example: %@" : {
+
+    },
+    "example.com" : {
+
+    },
+    "Export All Rules…" : {
+
+    },
+    "Export…" : {
+
+    },
+    "Extract into another folder" : {
+
+    },
+    "Failed" : {
+
+    },
+    "File" : {
+
+    },
+    "File Event" : {
+
+    },
+    "File settle delay" : {
+
+    },
+    "Files Only" : {
+
+    },
+    "Filter" : {
+
+    },
+    "Filter rules" : {
+
+    },
+    "Finder returned an unknown error." : {
+
+    },
+    "Finding matching files…" : {
+
+    },
+    "Fix the marked problems to save." : {
+
+    },
+    "Folder" : {
+
+    },
+    "Folder missing: %@" : {
+
+    },
+    "Folder unavailable: %@" : {
+
+    },
+    "Folders" : {
+
+    },
+    "Folders your rules watch appear here." : {
+
+    },
+    "Free and open source under the MIT License." : {
+
+    },
+    "General" : {
+
+    },
+    "GitHub" : {
+
+    },
+    "Has Errors" : {
+
+    },
+    "History reset. Rules re-check existing files on their next run." : {
+
+    },
+    "hours" : {
+
+    },
+    "How long a new file must stay unchanged before rules run on it." : {
+
+    },
+    "If" : {
+
+    },
+    "IF" : {
+
+    },
+    "If the name exists" : {
+
+    },
+    "Import Rules…" : {
+
+    },
+    "Imported %lld rules" : {
+
+    },
+    "Imported 1 rule" : {
+
+    },
+    "Imported rules start disabled. Check their folders, then turn them on in the Rules window." : {
+
+    },
+    "in" : {
+
+    },
+    "Include hidden files" : {
+
+    },
+    "Include subfolders" : {
+
+    },
+    "Insert a token" : {
+
+    },
+    "Its kind is Disk Image" : {
+
+    },
+    "Keep Editing" : {
+
+    },
+    "Kind" : {
+
+    },
+    "Last Run" : {
+
+    },
+    "Last run %@ · %lld files" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Last run %1$@ · %2$lld files"
+          }
+        }
+      }
+    },
+    "Launch at login" : {
+
+    },
+    "License" : {
+
+    },
+    "macOS protects %@. When MFPete first opens this folder, macOS asks for permission. Click Allow so the rule can see its files. You can change this later in System Settings › Privacy & Security › Files and Folders." : {
+
+    },
+    "Manual" : {
+
+    },
+    "Match" : {
+
+    },
+    "Match case" : {
+
+    },
+    "Match case: off (Invoice = invoice)" : {
+
+    },
+    "Match case: on (Invoice ≠ invoice)" : {
+
+    },
+    "Matches %lld files and folders right now" : {
+
+    },
+    "Matches %lld files and folders right now (%lld already processed)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Matches %1$lld files and folders right now (%2$lld already processed)"
+          }
+        }
+      }
+    },
+    "Matches %lld files right now" : {
+
+    },
+    "Matches %lld files right now (%lld already processed)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Matches %1$lld files right now (%2$lld already processed)"
+          }
+        }
+      }
+    },
+    "Matches %lld folders right now" : {
+
+    },
+    "Matches %lld folders right now (%lld already processed)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Matches %1$lld folders right now (%2$lld already processed)"
+          }
+        }
+      }
+    },
+    "Matches every file and folder in this folder." : {
+
+    },
+    "md" : {
+
+    },
+    "Message" : {
+
+    },
+    "MFPete" : {
+
+    },
+    "MFPete — %lld rules active" : {
+
+    },
+    "MFPete — paused" : {
+
+    },
+    "MFPete checks each folder before every run." : {
+
+    },
+    "MFPete could not read its rules file or the backup, so it started with no rules." : {
+
+    },
+    "MFPete could not read its rules file, so it loaded the backup copy. Your most recent rule change may be missing." : {
+
+    },
+    "MFPete lives here" : {
+
+    },
+    "MFPete Needs Access to %@" : {
+
+    },
+    "MFPete needs permission to control Finder. Turn on Finder for MFPete in System Settings › Privacy & Security › Automation." : {
+
+    },
+    "MFPete Rules" : {
+
+    },
+    "MFPete sends one short summary when something fails or after Run Now. It works fine without them." : {
+
+    },
+    "MFPete watches your folders and tidies files for you, using simple rules." : {
+
+    },
+    "MFPete, a rule needs attention" : {
+
+    },
+    "MFPete, paused" : {
+
+    },
+    "Minimum is 5 minutes." : {
+
+    },
+    "minutes" : {
+
+    },
+    "Missing" : {
+
+    },
+    "More actions" : {
+
+    },
+    "More options" : {
+
+    },
+    "Move Down" : {
+
+    },
+    "Move it to the Trash" : {
+
+    },
+    "Move the archive to the Trash afterwards" : {
+
+    },
+    "Move Up" : {
+
+    },
+    "Name" : {
+
+    },
+    "Nested group (%lld items)" : {
+
+    },
+    "Never run" : {
+
+    },
+    "New extension" : {
+
+    },
+    "New from Template" : {
+
+    },
+    "New rule" : {
+
+    },
+    "New Rule" : {
+
+    },
+    "No Activity" : {
+
+    },
+    "No activity yet" : {
+
+    },
+    "No entries match these filters." : {
+
+    },
+    "No Folders" : {
+
+    },
+    "No Matching Files" : {
+
+    },
+    "No Matching Rules" : {
+
+    },
+    "No permission" : {
+
+    },
+    "No permission: %@" : {
+
+    },
+    "No rules" : {
+
+    },
+    "No rules match your search and filters." : {
+
+    },
+    "No Rules Yet" : {
+
+    },
+    "No summaries. Check the Activity log to see what ran." : {
+
+    },
+    "Not allowed" : {
+
+    },
+    "Notes" : {
+
+    },
+    "Nothing in this rule's folders matches its conditions right now." : {
+
+    },
+    "Notifications" : {
+
+    },
+    "Notifications are turned off for MFPete in System Settings. The Activity log still records every run." : {
+
+    },
+    "Notify on each run" : {
+
+    },
+    "of the following are true:" : {
+
+    },
+    "of these are true:" : {
+
+    },
+    "OK" : {
+
+    },
+    "Only .zip archives are supported." : {
+
+    },
+    "Only New Files" : {
+
+    },
+    "Open Login Items…" : {
+
+    },
+    "Open Notifications…" : {
+
+    },
+    "Open Privacy & Security…" : {
+
+    },
+    "Open Rules…" : {
+
+    },
+    "Open System Settings" : {
+
+    },
+    "Opens Privacy & Security settings" : {
+
+    },
+    "Operator" : {
+
+    },
+    "Options" : {
+
+    },
+    "Pause All Rules" : {
+
+    },
+    "pdf" : {
+
+    },
+    "Pick at least one day." : {
+
+    },
+    "Preview" : {
+
+    },
+    "Preview makes no changes." : {
+
+    },
+    "Preview Matches…" : {
+
+    },
+    "Preview: %@" : {
+
+    },
+    "Processed files" : {
+
+    },
+    "Quit MFPete" : {
+
+    },
+    "Recent Activity" : {
+
+    },
+    "Remove action" : {
+
+    },
+    "Remove condition" : {
+
+    },
+    "Remove folder" : {
+
+    },
+    "Remove group" : {
+
+    },
+    "Reorder" : {
+
+    },
+    "Requires approval in System Settings › Login Items." : {
+
+    },
+    "Reset" : {
+
+    },
+    "Reset History…" : {
+
+    },
+    "Reset Processed-File History?" : {
+
+    },
+    "Result" : {
+
+    },
+    "Resume" : {
+
+    },
+    "Resume All Rules" : {
+
+    },
+    "Reveal %@ in Finder" : {
+
+    },
+    "Reveal in Finder" : {
+
+    },
+    "Rule" : {
+
+    },
+    "Rule name" : {
+
+    },
+    "Rules" : {
+
+    },
+    "Rules Could Not Be Loaded" : {
+
+    },
+    "Rules file" : {
+
+    },
+    "Rules only run while MFPete is open." : {
+
+    },
+    "Rules Restored from Backup" : {
+
+    },
+    "Rules resumed. Files added while paused were not processed." : {
+
+    },
+    "Run" : {
+
+    },
+    "Run %@ now" : {
+
+    },
+    "Run Again on All Files" : {
+
+    },
+    "Run Now" : {
+
+    },
+    "Run Now is not available for “File removed” rules" : {
+
+    },
+    "Run on Many Files?" : {
+
+    },
+    "Run Rule" : {
+
+    },
+    "Running %@" : {
+
+    },
+    "Save & Run" : {
+
+    },
+    "Save Rule" : {
+
+    },
+    "Save the rule, then run it once" : {
+
+    },
+    "scan" : {
+
+    },
+    "Scan Files Added While Paused" : {
+
+    },
+    "Scan Now" : {
+
+    },
+    "Schedule" : {
+
+    },
+    "Screenshot*" : {
+
+    },
+    "Search Rules" : {
+
+    },
+    "Set Up" : {
+
+    },
+    "Settings…" : {
+
+    },
+    "Show Activity" : {
+
+    },
+    "Show Activity…" : {
+
+    },
+    "Show File" : {
+
+    },
+    "Show icon in Dock" : {
+
+    },
+    "Show one rule's activity" : {
+
+    },
+    "Show only failed actions" : {
+
+    },
+    "Size" : {
+
+    },
+    "Skip" : {
+
+    },
+    "Skipped" : {
+
+    },
+    "Some Rules Were Turned Off" : {
+
+    },
+    "Sort" : {
+
+    },
+    "Sort By" : {
+
+    },
+    "Sort rules" : {
+
+    },
+    "Start from a template. You pick the folders and save." : {
+
+    },
+    "Status" : {
+
+    },
+    "Step %lld of %lld" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        }
+      }
+    },
+    "Stop processing other rules for matched files" : {
+
+    },
+    "Succeeded" : {
+
+    },
+    "Tag names, comma separated" : {
+
+    },
+    "Tags" : {
+
+    },
+    "Text" : {
+
+    },
+    "The “Show notification” action always posts, even when notifications are off." : {
+
+    },
+    "The file is already gone when this rule runs, so only Show notification is available." : {
+
+    },
+    "The unreadable file was kept as “%@” for recovery." : {
+
+    },
+    "Then" : {
+
+    },
+    "THEN" : {
+
+    },
+    "These rules use features from a newer version of MFPete and cannot run: %@." : {
+
+    },
+    "These rules use features from a newer version of MFPete, so they cannot run: %@." : {
+
+    },
+    "This cannot be undone. Files the rule already handled stay where they are." : {
+
+    },
+    "This rule also moves or changes folders, not just files." : {
+
+    },
+    "Time" : {
+
+    },
+    "Trigger" : {
+
+    },
+    "Unavailable" : {
+
+    },
+    "Unit" : {
+
+    },
+    "Unknown token: %@" : {
+
+    },
+    "Updates are turned off in this build." : {
+
+    },
+    "Use Default" : {
+
+    },
+    "Value" : {
+
+    },
+    "Version %@ (%@)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Version %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Welcome to MFPete" : {
+
+    },
+    "When" : {
+
+    },
+    "WHEN" : {
+
+    },
+    "With" : {
+
+    }
   },
   "version" : "1.0"
 }

@@ -1,7 +1,846 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "“%@” cannot run when a file is removed. Use Show notification." : {
 
+    },
+    "%@ (and %lld more)" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (and %2$lld more)"
+          }
+        }
+      }
+    },
+    "%@ (match case)" : {
+
+    },
+    "%@ and move the archive to the Trash" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%lld days" : {
+
+    },
+    "%lld files %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld files %2$@"
+          }
+        }
+      }
+    },
+    "%lld files failed" : {
+
+    },
+    "%lld files processed, %lld failed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld files processed, %2$lld failed"
+          }
+        }
+      }
+    },
+    "%lld hours" : {
+
+    },
+    "%lld minutes" : {
+
+    },
+    "%lld months" : {
+
+    },
+    "%lld weeks" : {
+
+    },
+    "1 file %@" : {
+
+    },
+    "1 file failed" : {
+
+    },
+    "1 file processed, %lld failed" : {
+
+    },
+    "A “%@” condition has an invalid operator or value." : {
+
+    },
+    "A file is added" : {
+
+    },
+    "A file is modified" : {
+
+    },
+    "A file is removed" : {
+
+    },
+    "a folder" : {
+
+    },
+    "Action failed" : {
+
+    },
+    "Add at least one action." : {
+
+    },
+    "Add at least one folder to watch." : {
+
+    },
+    "Add tags" : {
+
+    },
+    "Alias" : {
+
+    },
+    "Already in place" : {
+
+    },
+    "an unsupported condition" : {
+
+    },
+    "and" : {
+
+    },
+    "Any file" : {
+
+    },
+    "Application" : {
+
+    },
+    "Apply to existing" : {
+
+    },
+    "Archive" : {
+
+    },
+    "Archive moved to Trash" : {
+
+    },
+    "Archive old screenshots" : {
+
+    },
+    "Audio" : {
+
+    },
+    "Change extension" : {
+
+    },
+    "Change extension to %@" : {
+
+    },
+    "change its extension to %@" : {
+
+    },
+    "Check folders" : {
+
+    },
+    "Choose a base folder for “%@”." : {
+
+    },
+    "Choose a destination folder for “%@”." : {
+
+    },
+    "Choose a folder for every folder entry." : {
+
+    },
+    "Choose a folder to unarchive into." : {
+
+    },
+    "Clean up Downloads" : {
+
+    },
+    "contains" : {
+
+    },
+    "contains tag" : {
+
+    },
+    "copied to %@" : {
+
+    },
+    "copy it to %@" : {
+
+    },
+    "Copy to %@" : {
+
+    },
+    "Copy to folder" : {
+
+    },
+    "Could not unarchive: %@" : {
+
+    },
+    "Date added" : {
+
+    },
+    "Date created" : {
+
+    },
+    "Date modified" : {
+
+    },
+    "day" : {
+
+    },
+    "days" : {
+
+    },
+    "Desktop" : {
+
+    },
+    "Destination folder missing: %@" : {
+
+    },
+    "Disk full" : {
+
+    },
+    "Disk Image" : {
+
+    },
+    "do nothing" : {
+
+    },
+    "Document" : {
+
+    },
+    "Documents" : {
+
+    },
+    "does not contain" : {
+
+    },
+    "does not contain tag" : {
+
+    },
+    "Downloaded from" : {
+
+    },
+    "Downloads" : {
+
+    },
+    "ends with" : {
+
+    },
+    "Enter a name pattern for “%@”." : {
+
+    },
+    "Enter a notification message." : {
+
+    },
+    "Enter a subfolder pattern for “%@”." : {
+
+    },
+    "Enter a value for the “%@” condition." : {
+
+    },
+    "Enter at least one tag for “%@”." : {
+
+    },
+    "Enter the new extension." : {
+
+    },
+    "Errors only" : {
+
+    },
+    "Every %@ at %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Every %1$@ at %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Every %lld days at %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Every %1$lld days at %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Every %lld hours" : {
+
+    },
+    "Every %lld minutes" : {
+
+    },
+    "Every day at %@, %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Every day at %1$@, %2$@"
+          }
+        }
+      }
+    },
+    "Every day or every few days" : {
+
+    },
+    "Every few minutes or hours" : {
+
+    },
+    "Every hour" : {
+
+    },
+    "Every run" : {
+
+    },
+    "Every week" : {
+
+    },
+    "Extension" : {
+
+    },
+    "Extract new zip files and trash the archive" : {
+
+    },
+    "File" : {
+
+    },
+    "File (anything but a folder)" : {
+
+    },
+    "File event" : {
+
+    },
+    "File no longer exists" : {
+
+    },
+    "Folder" : {
+
+    },
+    "Folder missing: %@" : {
+
+    },
+    "for files and folders in %@" : {
+
+    },
+    "for files in %@" : {
+
+    },
+    "for folders in %@" : {
+
+    },
+    "GB" : {
+
+    },
+    "has no tags" : {
+
+    },
+    "hour" : {
+
+    },
+    "hours" : {
+
+    },
+    "iCloud Drive" : {
+
+    },
+    "if %@" : {
+
+    },
+    "Image" : {
+
+    },
+    "is" : {
+
+    },
+    "is after" : {
+
+    },
+    "is after %@" : {
+
+    },
+    "is any of" : {
+
+    },
+    "is before" : {
+
+    },
+    "is before %@" : {
+
+    },
+    "is greater than" : {
+
+    },
+    "is in the last" : {
+
+    },
+    "is in the last %@" : {
+
+    },
+    "is less than" : {
+
+    },
+    "is not" : {
+
+    },
+    "is not in the last" : {
+
+    },
+    "is not in the last %@" : {
+
+    },
+    "it has no tags" : {
+
+    },
+    "it is any file" : {
+
+    },
+    "its date added %@" : {
+
+    },
+    "its date created %@" : {
+
+    },
+    "its date modified %@" : {
+
+    },
+    "its download source %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "its download source %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "its extension is %@" : {
+
+    },
+    "its extension is not %@" : {
+
+    },
+    "its kind is %@" : {
+
+    },
+    "its kind is not %@" : {
+
+    },
+    "its name with extension %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "its name with extension %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "its name without extension %@ %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "its name without extension %1$@ %2$@"
+          }
+        }
+      }
+    },
+    "its size is greater than %@" : {
+
+    },
+    "its size is less than %@" : {
+
+    },
+    "its tags do not include %@" : {
+
+    },
+    "its tags include %@" : {
+
+    },
+    "KB" : {
+
+    },
+    "Keep both" : {
+
+    },
+    "Keep Desktop clean" : {
+
+    },
+    "Kind" : {
+
+    },
+    "Loop guard" : {
+
+    },
+    "Manual" : {
+
+    },
+    "matches" : {
+
+    },
+    "matches pattern" : {
+
+    },
+    "MB" : {
+
+    },
+    "minute" : {
+
+    },
+    "minutes" : {
+
+    },
+    "month" : {
+
+    },
+    "months" : {
+
+    },
+    "Move destination is the folder being watched. Choose another folder." : {
+
+    },
+    "move it to %@" : {
+
+    },
+    "move it to the Trash" : {
+
+    },
+    "Move new Desktop files into Desktop Inbox" : {
+
+    },
+    "Move screenshots older than 3 days into Archive" : {
+
+    },
+    "Move to %@" : {
+
+    },
+    "Move to folder" : {
+
+    },
+    "Move to Trash" : {
+
+    },
+    "moved to %@" : {
+
+    },
+    "moved to Trash" : {
+
+    },
+    "Movie" : {
+
+    },
+    "Name (no extension)" : {
+
+    },
+    "Name with extension" : {
+
+    },
+    "network volumes" : {
+
+    },
+    "New Rule" : {
+
+    },
+    "No matching files" : {
+
+    },
+    "No new matching files" : {
+
+    },
+    "No new matching files (%lld already processed)" : {
+
+    },
+    "No permission: %@" : {
+
+    },
+    "Not available for removed files" : {
+
+    },
+    "Off" : {
+
+    },
+    "Only .zip archives can be unarchived" : {
+
+    },
+    "Open" : {
+
+    },
+    "open it" : {
+
+    },
+    "open it with %@" : {
+
+    },
+    "opened" : {
+
+    },
+    "or" : {
+
+    },
+    "Other" : {
+
+    },
+    "PDF" : {
+
+    },
+    "Permission denied" : {
+
+    },
+    "Pick a valid time of day." : {
+
+    },
+    "Pick at least one day of the week." : {
+
+    },
+    "Possible rule loop" : {
+
+    },
+    "Possible rule loop between %@ and %@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Possible rule loop between %1$@ and %2$@"
+          }
+        }
+      }
+    },
+    "Possible rule loop in %@" : {
+
+    },
+    "processed" : {
+
+    },
+    "Ran late" : {
+
+    },
+    "Ran late (missed %@)" : {
+
+    },
+    "removable volumes" : {
+
+    },
+    "Remove tags" : {
+
+    },
+    "remove tags %@" : {
+
+    },
+    "Remove the action this version of MFPete does not support." : {
+
+    },
+    "Remove the condition this version of MFPete does not support." : {
+
+    },
+    "removed" : {
+
+    },
+    "Rename" : {
+
+    },
+    "Rename .txt files to .md and move them" : {
+
+    },
+    "rename it to “%@”" : {
+
+    },
+    "renamed" : {
+
+    },
+    "Replace (old one to Trash)" : {
+
+    },
+    "Reveal in Finder" : {
+
+    },
+    "reveal it in Finder" : {
+
+    },
+    "revealed in Finder" : {
+
+    },
+    "Rule loop stopped" : {
+
+    },
+    "Run" : {
+
+    },
+    "run an unsupported action" : {
+
+    },
+    "Run at least every 1 day." : {
+
+    },
+    "Run at most every %lld minutes." : {
+
+    },
+    "Scheduled" : {
+
+    },
+    "show a notification" : {
+
+    },
+    "Show notification" : {
+
+    },
+    "Size" : {
+
+    },
+    "Skip" : {
+
+    },
+    "Skipped: name exists" : {
+
+    },
+    "Sort by type" : {
+
+    },
+    "Sort into subfolder" : {
+
+    },
+    "Sort into subfolders" : {
+
+    },
+    "sort it into %@/%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "sort it into %1$@/%2$@"
+          }
+        }
+      }
+    },
+    "Sort new files into subfolders by extension" : {
+
+    },
+    "sorted" : {
+
+    },
+    "starts with" : {
+
+    },
+    "tag it %@" : {
+
+    },
+    "tagged" : {
+
+    },
+    "Tags" : {
+
+    },
+    "Text" : {
+
+    },
+    "Text to Markdown" : {
+
+    },
+    "The archive is empty" : {
+
+    },
+    "The file contains no rules." : {
+
+    },
+    "The file is moved into the folder it is already in." : {
+
+    },
+    "The file is not a MFPete rules file." : {
+
+    },
+    "The file was made by a newer version of MFPete. Update MFPete, then import again." : {
+
+    },
+    "The name pattern produced an empty name" : {
+
+    },
+    "then %@" : {
+
+    },
+    "this folder" : {
+
+    },
+    "This rule acts on every file in %@ and can replace existing files." : {
+
+    },
+    "This rule will trash every file added to %@." : {
+
+    },
+    "This rule will trash every file in %@." : {
+
+    },
+    "Trash old disk images and archives every day" : {
+
+    },
+    "Unarchive" : {
+
+    },
+    "unarchive it" : {
+
+    },
+    "unarchive it into %@" : {
+
+    },
+    "unarchived" : {
+
+    },
+    "Unknown action" : {
+
+    },
+    "Unknown token {%@} will appear as typed." : {
+
+    },
+    "untagged" : {
+
+    },
+    "Unzip downloads" : {
+
+    },
+    "week" : {
+
+    },
+    "weeks" : {
+
+    },
+    "When a file is added to %@" : {
+
+    },
+    "When a file is modified in %@" : {
+
+    },
+    "When a file is removed from %@" : {
+
+    },
+    "When a file or folder is added to %@" : {
+
+    },
+    "When a file or folder is modified in %@" : {
+
+    },
+    "When a file or folder is removed from %@" : {
+
+    },
+    "When a folder is added to %@" : {
+
+    },
+    "When a folder is modified in %@" : {
+
+    },
+    "When a folder is removed from %@" : {
+
+    }
   },
   "version" : "1.0"
 }

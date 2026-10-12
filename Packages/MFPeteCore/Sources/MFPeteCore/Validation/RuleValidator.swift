@@ -14,6 +14,7 @@ public struct RuleIssue: Hashable, Sendable {
         case intervalTooShort
         case noWeekdays
         case invalidTime
+        case invalidDayCount
         case conditionValueMissing
         case conditionInvalid
         case unknownCondition
@@ -93,6 +94,12 @@ public struct RuleValidator: Sendable {
         rule.conditions.items.isEmpty
     }
 
+    /// The rule can match folders and an action would move, rename, or
+    /// delete them. Users rarely mean that.
+    public static func showsFolderHint(_ rule: Rule) -> Bool {
+        rule.conditions.itemTypes == .filesAndFolders && rule.actions.contains(where: \.changesItem)
+    }
+
     /// Age conditions on a file-event rule rarely do what the user wants
     /// (spec §4.2 notes).
     public static func showsAgeHint(_ rule: Rule) -> Bool {
@@ -124,8 +131,15 @@ public struct RuleValidator: Sendable {
                 issues.append(RuleIssue(.error, .invalidTime, localized("Pick a valid time of day.")))
             }
             return issues
-        case .daily(let hour, let minute) where !Self.isValidTime(hour, minute):
-            return [RuleIssue(.error, .invalidTime, localized("Pick a valid time of day."))]
+        case .daily(let hour, let minute, let days):
+            var issues: [RuleIssue] = []
+            if days < 1 {
+                issues.append(RuleIssue(.error, .invalidDayCount, localized("Run at least every 1 day.")))
+            }
+            if !Self.isValidTime(hour, minute) {
+                issues.append(RuleIssue(.error, .invalidTime, localized("Pick a valid time of day.")))
+            }
+            return issues
         default:
             return []
         }

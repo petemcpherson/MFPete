@@ -97,6 +97,37 @@ struct SchedulerTests {
         #expect(decision == .wait(until: date(utcCalendar, 2026, 10, 2, 9)))
     }
 
+    @Test func everyFewDaysCountsFromLastSlot() {
+        let every3 = Trigger.daily(hour: 9, minute: 0, days: 3)
+        // Ran on time Oct 1 at 9:00: next is Oct 4 at 9:00.
+        #expect(utc.nextFireDate(for: every3, after: date(utcCalendar, 2026, 10, 1, 9, 0, 5)) == date(utcCalendar, 2026, 10, 4, 9))
+        // Ran late at 15:00 for the 9:00 slot: still Oct 4 at 9:00.
+        #expect(utc.nextFireDate(for: every3, after: date(utcCalendar, 2026, 10, 1, 15)) == date(utcCalendar, 2026, 10, 4, 9))
+    }
+
+    @Test func everyFewDaysKeepsTimeAcrossDST() {
+        // Ran Saturday Oct 31 at 9:00 EDT; clocks fall back Nov 1.
+        let next = ny.nextFireDate(for: .daily(hour: 9, minute: 0, days: 3), after: date(newYork, 2026, 10, 31, 9))!
+        #expect(next == date(newYork, 2026, 11, 3, 9))
+    }
+
+    @Test func newEveryFewDaysRuleRunsAtNextTime() {
+        let every3 = Trigger.daily(hour: 9, minute: 0, days: 3)
+        // Created at noon, after 9:00: first run tomorrow, not in three days.
+        let start = utc.initialLastRun(for: every3, now: testNow)
+        #expect(utc.nextFireDate(for: every3, after: start) == date(utcCalendar, 2026, 10, 2, 9))
+        // Created before 9:00: first run today.
+        let early = date(utcCalendar, 2026, 10, 1, 8)
+        #expect(utc.nextFireDate(for: every3, after: utc.initialLastRun(for: every3, now: early)) == date(utcCalendar, 2026, 10, 1, 9))
+        #expect(utc.initialLastRun(for: .daily(hour: 9, minute: 0), now: testNow) == testNow)
+    }
+
+    @Test func missedEveryFewDaysNamesLatestSlot() {
+        // Last ran Sep 22 at 9:00; slots Sep 25 and Sep 28 passed, Oct 1 9:00 too.
+        let decision = utc.decision(for: .daily(hour: 9, minute: 0, days: 3), lastRun: date(utcCalendar, 2026, 9, 22, 9), now: testNow)
+        #expect(decision == .runLate(missed: date(utcCalendar, 2026, 10, 1, 9)))
+    }
+
     @Test func intervalDecisions() {
         let trigger = Trigger.interval(minutes: 30)
         if case .wait = utc.decision(for: trigger, lastRun: testNow.addingTimeInterval(-10 * 60), now: testNow) {} else {

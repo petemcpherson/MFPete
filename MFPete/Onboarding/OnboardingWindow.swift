@@ -1,6 +1,7 @@
 import AppKit
 import MFPeteCore
 import SwiftUI
+import UserNotifications
 
 /// First-launch window (spec §8.7): what MFPete does, launch at login and
 /// notifications, then a first rule from a template or Skip. Closing the
@@ -10,8 +11,8 @@ struct OnboardingWindow: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @State private var step = Step.intro
     @State private var launchAtLogin = true
-    @State private var notificationsAsked = false
-    @State private var notificationsAllowed = false
+    @State private var notificationStatus = UNAuthorizationStatus.notDetermined
+    @State private var notificationRequestPending = false
 
     /// UI tests opt in with `--ui-testing-onboarding`; otherwise UI tests
     /// skip onboarding so they start on the Rules window.
@@ -84,20 +85,38 @@ struct OnboardingWindow: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer()
-                if notificationsAsked {
-                    Label(notificationsAllowed ? "Allowed" : "Not allowed",
-                          systemImage: notificationsAllowed ? "checkmark.circle.fill" : "xmark.circle")
-                        .foregroundStyle(notificationsAllowed ? .green : .secondary)
-                } else {
-                    Button("Allow Notifications…") {
-                        Task {
-                            notificationsAllowed = await NotificationPermission.request()
-                            notificationsAsked = true
+                switch notificationStatus {
+                case .authorized, .provisional:
+                    Label("Allowed", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                case .denied:
+                    Label("Not allowed", systemImage: "xmark.circle")
+                        .foregroundStyle(.secondary)
+                default:
+                    if notificationRequestPending {
+                        // macOS asks with a banner in the top-right corner,
+                        // not a dialog. Asking again while it shows fails.
+                        Text("Click Allow in the banner\nat the top right.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    } else {
+                        Button("Allow Notifications…") {
+                            notificationRequestPending = true
+                            Task {
+                                _ = await NotificationPermission.request()
+                                notificationStatus = await NotificationPermission.status()
+                                notificationRequestPending = false
+                            }
                         }
                     }
                 }
             }
             Spacer()
+        }
+        .task { notificationStatus = await NotificationPermission.status() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { notificationStatus = await NotificationPermission.status() }
         }
     }
 

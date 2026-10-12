@@ -55,6 +55,8 @@ struct RuleValidatorTests {
 
     @Test func dailyNeedsAValidTime() {
         #expect(codes(rule(trigger: .daily(hour: 24, minute: 0))) == [.invalidTime])
+        #expect(codes(rule(trigger: .daily(hour: 9, minute: 0, days: 0))) == [.invalidDayCount])
+        #expect(codes(rule(trigger: .daily(hour: 9, minute: 0, days: 3))).isEmpty)
     }
 
     // MARK: Conditions
@@ -245,6 +247,7 @@ struct EditorChoicesTests {
         #expect(weekly == .weekly(weekdays: [2], hour: 18, minute: 30))
         let daily = TriggerType.daily.makeTrigger(from: .weekly(weekdays: [1, 7], hour: 7, minute: 15))
         #expect(daily == .daily(hour: 7, minute: 15))
+        #expect(TriggerType.daily.makeTrigger(from: .daily(hour: 7, minute: 15, days: 3)) == .daily(hour: 7, minute: 15, days: 3))
         #expect(TriggerType.interval.makeTrigger(from: .interval(minutes: 15)) == .interval(minutes: 15))
     }
 
@@ -252,6 +255,12 @@ struct EditorChoicesTests {
         for attribute in Attribute.allCases {
             #expect(attribute.makeCondition().isWellFormed, "\(attribute)")
         }
+    }
+
+    @Test func changingAttributeKeepsMatchCaseOnlyForTextAttributes() {
+        let name = Condition(attribute: .name, op: .is, value: .text("pdf"), caseSensitive: true)
+        #expect(name.changingAttribute(to: .fullName).caseSensitive)
+        #expect(!name.changingAttribute(to: .extension).caseSensitive)
     }
 
     @Test func changingAttributeKeepsFittingOperatorAndValue() {
@@ -296,5 +305,65 @@ struct ProtectedLocationTests {
         #expect(ProtectedLocation.of(FolderRef(path: "/Users/me/Screenshots"), home: home) == nil)
         #expect(ProtectedLocation.of(FolderRef(path: "/Users/me/DownloadsOld"), home: home) == nil)
         #expect(ProtectedLocation.of(FolderRef(path: "/tmp"), home: home) == nil)
+    }
+}
+
+struct ItemTypesTests {
+    private func makeGroup(_ conditions: [Condition], match: Match = .all) -> ConditionGroup {
+        ConditionGroup(match: match, items: conditions.map { .condition($0) })
+    }
+
+    @Test func conditionsDecideItemTypes() {
+        let name = Condition(attribute: .name, op: .contains, value: .text("a"))
+        let folder = Condition(attribute: .kind, op: .is, value: .kind(.folder))
+        let pdf = Condition(attribute: .extension, op: .is, value: .text("pdf"))
+        let size = Condition(attribute: .size, op: .greaterThan, value: .size(1, .mb))
+        #expect(makeGroup([]).itemTypes == .filesAndFolders)
+        #expect(makeGroup([name]).itemTypes == .filesAndFolders)
+        #expect(makeGroup([.filesOnly, name]).itemTypes == .files)
+        #expect(makeGroup([folder]).itemTypes == .folders)
+        #expect(makeGroup([pdf]).itemTypes == .files)
+        #expect(makeGroup([size]).itemTypes == .files)
+        #expect(makeGroup([pdf, name], match: .any).itemTypes == .filesAndFolders)
+        #expect(makeGroup([pdf, size], match: .any).itemTypes == .files)
+        let nested = ConditionGroup(items: [.condition(name), .group(makeGroup([pdf, size], match: .any))])
+        #expect(nested.itemTypes == .files)
+    }
+
+    @Test func fileKindMatchesEverythingButFolders() {
+        #expect(FileKind.file.includes(.image))
+        #expect(FileKind.file.includes(.other))
+        #expect(!FileKind.file.includes(.folder))
+        #expect(FileKind.image.includes(.image))
+        #expect(!FileKind.image.includes(.pdf))
+    }
+
+    @Test func folderHintOnlyForChangingActions() {
+        var rule = Rule(scope: [FolderRef(path: "/tmp")], actions: [.trash])
+        #expect(RuleValidator.showsFolderHint(rule))
+        rule.actions = [.notify(message: "")]
+        #expect(!RuleValidator.showsFolderHint(rule))
+        rule.actions = [.trash]
+        rule.conditions = ConditionGroup(items: [.condition(.filesOnly)])
+        #expect(!RuleValidator.showsFolderHint(rule))
+    }
+
+    @Test func restrictingToFiles() {
+        let name = Condition(attribute: .name, op: .contains, value: .text("a"))
+        let tag = Condition(attribute: .tags, op: .hasNoTags)
+        var rule = Rule(conditions: ConditionGroup(items: [.condition(name)]))
+        #expect(rule.restrictedToFiles()?.conditions == ConditionGroup(items: [.condition(.filesOnly), .condition(name)]))
+
+        rule.conditions = ConditionGroup(match: .any, items: [.condition(name), .condition(tag)])
+        let wrapped = rule.restrictedToFiles()?.conditions
+        #expect(wrapped == ConditionGroup(items: [.condition(.filesOnly), .group(rule.conditions)]))
+        #expect(wrapped?.itemTypes == .files)
+
+        rule.conditions.items.append(.group(ConditionGroup(items: [.condition(tag)])))
+        #expect(rule.restrictedToFiles() == nil)
+    }
+
+    @Test func newBlankRuleSkipsFolders() {
+        #expect(Rule.newBlank().conditions.itemTypes == .files)
     }
 }

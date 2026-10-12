@@ -21,6 +21,7 @@ struct CodingTests {
         .fileRemoved,
         .interval(minutes: 30),
         .daily(hour: 9, minute: 0),
+        .daily(hour: 9, minute: 0, days: 3),
         .weekly(weekdays: [2, 4, 6], hour: 18, minute: 15),
     ]
 
